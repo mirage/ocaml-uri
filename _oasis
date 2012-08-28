@@ -1,10 +1,10 @@
-OASISFormat: 0.2
+OASISFormat: 0.3
 Name:        uri
 Version:     0.1-dev
 Synopsis:    RFC3968 URI parsing library
 Authors:     Anil Madhavapeddy
 License:     LGPL-2.0 with OCaml linking exception
-Plugins:     META (0.2)
+Plugins:     META (0.3)
 BuildTools:  ocamlbuild
 
 Library uri
@@ -12,13 +12,9 @@ Library uri
   Modules:    Uri,Uri_re,Uri_IP
   BuildDepends: re.posix,re.str
 
-Flag tests
-  Description:        Build and run tests
-  Default:            true
-
 Document uri
   Title:                URI docs
-  Type:                 ocamlbuild (0.2)
+  Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
   XOCamlbuildPath:      lib
   XOCamlbuildLibraries: uri
