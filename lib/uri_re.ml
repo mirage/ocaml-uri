@@ -32,7 +32,7 @@ module Raw = struct
   let c_hash = char '#'
   
   let reserved = gen_delims / sub_delims
-  let unreserved = Re_posix.re "[A-Za-z0-9\\-\\.\\_~]"
+  let unreserved = Re_posix.re "[A-Za-z0-9-._~]"
   let hexdig = Re_posix.re "[0-9A-Fa-f]"
   let pct_encoded = (char '%') + hexdig + hexdig
   
@@ -109,3 +109,4 @@ let ipv4_address = Re_posix.compile Raw.ipv4_address
 let ipv6_address = Re_posix.compile Raw.ipv6_address
 let uri_reference = Re_posix.compile Raw.uri_reference
 let authority = Re_posix.compile Raw.authority
+let host = Re_posix.compile Raw.host

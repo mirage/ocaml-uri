@@ -1,23 +1,50 @@
 OASISFormat: 0.3
 Name:        uri
-Version:     0.1-dev
+Version:     1.3.3
 Synopsis:    RFC3968 URI parsing library
-Authors:     Anil Madhavapeddy
-License:     LGPL-2.0 with OCaml linking exception
-Plugins:     META (0.3)
+Authors:     Anil Madhavapeddy, David Sheets
+License:     ISC
+Plugins:     META (0.2)
 BuildTools:  ocamlbuild
+PostConfCommand: sh etc/gen.sh
+
+Flag allservices
+  Description: build the full services library
+  Default: false
 
 Library uri
   Path:       lib
   Modules:    Uri,Uri_re,Uri_IP
   BuildDepends: re.posix,re.str
 
+Library services
+  Path:       lib
+  Findlibname: services
+  FindlibParent: uri
+  Modules:    Uri_services
+  BuildDepends: uri
+
+Library services_full
+  Build$: flag(allservices)
+  Path:       lib
+  Findlibname: services_full
+  FindlibParent: uri
+  Modules:    Uri_services_full
+  BuildDepends: uri
+
 Document uri
   Title:                URI docs
-  Type:                 ocamlbuild (0.3)
+  Type:                 ocamlbuild (0.2)
   BuildTools+:          ocamldoc
   XOCamlbuildPath:      lib
   XOCamlbuildLibraries: uri
+
+Document uri_services
+  Title:                URI services docs
+  Type:                 ocamlbuild (0.2)
+  BuildTools+:          ocamldoc
+  XOCamlbuildPath:      lib
+  XOCamlbuildLibraries: uri.services
 
 Executable test_runner
   Path:               lib_test

@@ -17,26 +17,21 @@
 
 type t
 
-(** This abstract type represents a set of safe characters allowed in a
-    portion of a URI. Anything not allowed will be percent-encoded. Note that
-    different portions of the URI permit a different set of allowed
-    characters. *)
-type safe_chars
+type component = [
+  `Scheme
+| `Authority
+| `Userinfo (* subcomponent of authority in some schemes *)
+| `Host (* subcomponent of authority in some schemes *)
+| `Path
+| `Query
+| `Query_key
+| `Query_value
+| `Fragment
+]
 
-(** This represents the minimal set of safe characters allowed in a URI.
-    `[A-Z][a-z]._-` *)
-val safe_chars : safe_chars
-
-(** This is the set allowed for the path component *)
-val safe_chars_for_path : safe_chars
-
-(** This is the set allowed for the user info component *)
-val safe_chars_for_userinfo : safe_chars
-
-(** Percent-encode a string. The [safe_chars] argument defaults to the set of
-    characters for a path component, and should be set differently for other
-    URI components *)
-val pct_encode : ?safe_chars:safe_chars -> string -> string
+(** Percent-encode a string. The [scheme] argument defaults to 'http' and
+    the [component] argument defaults to `Path *)
+val pct_encode : ?scheme:string -> ?component:component -> string -> string
 
 (** Percent-decode a percent-encoded string *)
 val pct_decode : string -> string
@@ -47,39 +42,46 @@ val of_string : string -> t
 (** Convert a URI structure into a percent-encoded URI string *)
 val to_string : t -> string
 
+(** Resolve a URI against a default scheme and base URI *)
+val resolve : string -> t -> t -> t
+
 (** Get a query string from a URI *)
-val query : t -> (string * string) list
+val query : t -> (string * string list) list
 
 (** Make a percent-encoded query string from percent-decoded query tuple *)
-val encoded_of_query : (string * string) list -> string
+val encoded_of_query : (string * string list) list -> string
 
 (** Parse a percent-encoded query string into a percent-decoded query tuple *)
-val query_of_encoded : string -> (string * string) list
-
-(** Parse a percent-decoded query string into a percent-decoded query tuple *)
-val query_of_decoded : string -> (string * string) list
+val query_of_encoded : string -> (string * string list) list
 
 (** Replace the query URI with the supplied list.
   * Input URI is not modified
   *)
-val with_query : t -> (string * string) list -> t
+val with_query : t -> (string * string list) list -> t
 
 (** Add a query parameter to the input query URI.
   * Input URI is not modified
   *)
-val add_query_param : t -> (string * string) -> t
+val add_query_param : t -> (string * string list) -> t
 
 (** Add a query parameter list to the input query URI.
   * Input URI is not modified
   *)
-val add_query_params : t -> (string * string) list -> t
+val add_query_params : t -> (string * string list) list -> t
 
 val make : ?scheme:string -> ?userinfo:string -> ?host:string ->
-  ?port:int -> ?path:string -> ?query:(string * string) list -> 
+  ?port:int -> ?path:string -> ?query:(string * string list) list -> 
   ?fragment:string -> unit -> t
 
 (** Get the path component of a URI *)
 val path : t -> string
+
+(** Get the path and query components of a URI *)
+val path_and_query : t -> string
+
+(** Replace the path URI with the supplied path.
+  * Input URI is not modified *)
+val with_path : t -> string -> t
 
 (** Get the scheme component of a URI *)
 val scheme : t -> string option
@@ -89,6 +91,10 @@ val userinfo : t -> string option
 
 (** Get the host component of a URI *)
 val host : t -> string option
+
+(** Get the host component of a URI, with a default
+  * supplied if one is not present *)
+val host_with_default: ?default:string -> t -> string
 
 (** Get the port component of a URI *)
 val port : t -> int option

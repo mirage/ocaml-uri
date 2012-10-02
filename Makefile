@@ -2,16 +2,14 @@
 all: build doc
 
 NAME=uri
-J=4
-
-export OCAMLRUNPARAM=b
+J ?= 2
 
 setup.bin: setup.ml
 	ocamlopt.opt -o $@ $< || ocamlopt -o $@ $< || ocamlc -o $@ $<
-	$(RM) setup.cmx setup.cmi setup.o setup.cmo
+	rm -f setup.cmx setup.cmi setup.o setup.cmo
 
 setup.data: setup.bin
-	./setup.bin -configure
+	./setup.bin -configure --enable-tests
 
 build: setup.data setup.bin
 	./setup.bin -build -j $(J)
@@ -31,4 +29,4 @@ reinstall: setup.bin
 
 clean:
 	ocamlbuild -clean
-	$(RM) setup.data setup.log setup.bin
+	rm -f setup.data setup.log setup.bin lib/Uri_services.ml lib/Uri_services_full.ml
