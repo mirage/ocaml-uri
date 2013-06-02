@@ -25,6 +25,7 @@ type component = [
 | `Query_key
 | `Query_value
 | `Fragment
+| `RFC3986
 ]
 
 let rec iter_concat fn sep buf = function
@@ -292,17 +293,17 @@ module Query = struct
    * Tuple inputs are percent decoded and will be encoded by
    * this function.
    *)
-  let encoded_of_query l =
+  let encoded_of_query ?(key_component=`Query_key) ?(value_component=`Query_value) l =
     let len = List.fold_left (fun a (k,v) ->
       a + (String.length k)
       + (List.fold_left (fun a s -> a+(String.length s)+1) 0 v) + 2) (-1) l in
     let buf = Buffer.create len in
     iter_concat (fun buf (k,v) ->
-      Buffer.add_string buf (pct_encode ~component:`Query_key k);
+      Buffer.add_string buf (pct_encode ~component:key_component k);
       if v <> [] then (
         Buffer.add_char buf '=';
         iter_concat (fun buf s ->
-          Buffer.add_string buf (pct_encode ~component:`Query_value s)
+          Buffer.add_string buf (pct_encode ~component:value_component s)
         ) "," buf v)
     ) "&" buf l;
     Buffer.contents buf 

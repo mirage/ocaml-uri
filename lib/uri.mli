@@ -31,6 +31,7 @@ type component = [
 | `Query_key
 | `Query_value
 | `Fragment
+| `RFC3986 (** percent encode all chars that are not RFC3986 unreserved *)
 ]
 
 (** Percent-encode a string. The [scheme] argument defaults to 'http' and
@@ -53,7 +54,8 @@ val resolve : string -> t -> t -> t
 val query : t -> (string * string list) list
 
 (** Make a percent-encoded query string from percent-decoded query tuple *)
-val encoded_of_query : (string * string list) list -> string
+val encoded_of_query : ?key_component:component -> ?value_component:component ->
+  (string * string list) list -> string
 
 (** Parse a percent-encoded query string into a percent-decoded query tuple *)
 val query_of_encoded : string -> (string * string list) list
