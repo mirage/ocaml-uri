@@ -15,31 +15,34 @@
  *
  *)
 
+open Sexplib.Std
+open Sexplib.Conv (* Workaround for bug in Sexplib when used without Core *)
+
 type component = [
-  `Scheme
-| `Authority
-| `Userinfo (* subcomponent of authority in some schemes *)
-| `Host (* subcomponent of authority in some schemes *)
-| `Path
-| `Query
-| `Query_key
-| `Query_value
-| `Fragment
-]
+    `Scheme
+  | `Authority
+  | `Userinfo (* subcomponent of authority in some schemes *)
+  | `Host (* subcomponent of authority in some schemes *)
+  | `Path
+  | `Query
+  | `Query_key
+  | `Query_value
+  | `Fragment
+] with sexp
 
 let rec iter_concat fn sep buf = function
- | last::[] -> fn buf last
- | el::rest ->
-     fn buf el;
-     Buffer.add_string buf sep;
-     iter_concat fn sep buf rest
- | [] -> ()
+  | last::[] -> fn buf last
+  | el::rest ->
+    fn buf el;
+    Buffer.add_string buf sep;
+    iter_concat fn sep buf rest
+  | [] -> ()
 
 (** Safe characters that are always allowed in a URI 
   * Unfortunately, this varies depending on which bit of the URI
   * is being parsed, so there are multiple variants (and this
   * set is probably not exhaustive. TODO: check.
-  *)
+*)
 type safe_chars = bool array
 
 module type Scheme = sig
@@ -77,8 +80,8 @@ module Generic : Scheme = struct
     a.(Char.code '+') <- true;
     a
 
-(** Safe characters for the path component of a URI
-    TODO: sometimes ':' is unsafe (Sec 3.3 pchar vs segment-nz-nc) *)
+  (** Safe characters for the path component of a URI
+      TODO: sometimes ':' is unsafe (Sec 3.3 pchar vs segment-nz-nc) *)
   let safe_chars_for_path : safe_chars =
     let a = sub_delims (Array.copy safe_chars) in
     (* delimiter: non-segment delimiting uses should be pct encoded *)
@@ -108,8 +111,8 @@ module Generic : Scheme = struct
 
   let safe_chars_for_fragment : safe_chars = safe_chars_for_query
 
-(** Safe characters for the userinfo subcomponent of a URI.
-    TODO: this needs more reserved characters added *)
+  (** Safe characters for the userinfo subcomponent of a URI.
+      TODO: this needs more reserved characters added *)
   let safe_chars_for_userinfo : safe_chars =
     let a = Array.copy safe_chars in
     (* delimiter: non-segment delimiting uses should be pct encoded *)
@@ -152,7 +155,7 @@ let module_of_scheme = function
       | "http" | "https" -> (module Http : Scheme)
       | "file" -> (module File : Scheme)
       | _ -> (module Generic : Scheme)
-  end
+    end
   | None -> (module Generic : Scheme)
 
 (** Portions of the URL must be converted to-and-from percent-encoding
@@ -163,10 +166,10 @@ let module_of_scheme = function
   * internal safety.  These types are not exposed to the external 
   * interface, as casting to-and-from is quite a bit of hassle and
   * probably not a lot of use to the average consumer of this library 
-  *)
+*)
 module Pct : sig
-  type encoded
-  type decoded
+  type encoded with sexp
+  type decoded with sexp
 
   val encode : ?scheme:string -> ?component:component -> decoded -> encoded
   val decode : encoded -> decoded
@@ -184,8 +187,8 @@ module Pct : sig
   val unlift_encoded : (string -> string) -> encoded -> encoded
   val unlift_decoded : (string -> string) -> decoded -> decoded
 end = struct
-  type encoded = string
-  type decoded = string
+  type encoded = string with sexp
+  type decoded = string with sexp
   let cast_encoded x = x
   let cast_decoded x = x
   let empty_decoded = ""
@@ -222,8 +225,15 @@ end = struct
     scan 0 0;
     Buffer.contents buf
 
-
-  let int_of_hex_char c = Scanf.sscanf (String.make 1 c) "%x" (fun x -> x)
+  let int_of_hex_char c =
+    let c = int_of_char (Char.uppercase c) - 48 in
+    if c > 9
+    then if c > 16 && c < 23
+      then c - 7
+      else raise (Failure "int_of_hex_char")
+    else if c >= 0
+    then c
+    else raise (Failure "int_of_hex_char")
 
   (** Scan for percent-encoding and convert them into ASCII.
       @return a percent-decoded string *)
@@ -238,25 +248,28 @@ end = struct
         let cur = cur + 1 in
         if cur >= len then Buffer.add_char buf '%'
         else match (try Some (int_of_hex_char b.[cur])
-          with Scanf.Scan_failure _ ->
-            Buffer.add_char buf '%';
-            None) with
+                    with Failure "int_of_hex_char" ->
+                      Buffer.add_char buf '%';
+                      None) with
         | None -> scan cur cur
-        | Some highbits ->
+        | Some highbits -> begin
           let cur = cur + 1 in
-          if cur >= len then Buffer.(add_char buf '%'; add_char buf b.[cur-1])
-          else begin
+          if cur >= len then begin
+            Buffer.add_char buf '%';
+            Buffer.add_char buf b.[cur-1]
+          end else begin
             let start_at =
               try
                 let lowbits = int_of_hex_char b.[cur] in
                 Buffer.add_char buf (Char.chr (highbits lsl 4 + lowbits));
                 cur+1
-              with Scanf.Scan_failure _ ->
+              with Failure "int_of_hex_char" ->
                 Buffer.add_char buf '%';
                 Buffer.add_char buf b.[cur-1];
                 cur
             in scan start_at start_at
           end
+        end
       end else scan start (cur+1)
     in
     scan 0 0;
@@ -273,7 +286,7 @@ let pct_decode s = Pct.(uncast_decoded (decode (cast_encoded s)))
 (* Query string handling, to and from an assoc list of key/values *)
 module Query = struct
 
-  type t = (string * string list) list
+  type t = (string * string list) list with sexp
 
   let find q k = try Some (List.assoc k q) with Not_found -> None
 
@@ -299,8 +312,8 @@ module Query = struct
     let rec loop acc = function
       | (k::v::_)::tl ->
         let n = plus_to_space k,
-          (match Re_str.split_delim qs_cm (plus_to_space v) with
-            | [] -> [""] | l -> l) in
+                (match Re_str.split_delim qs_cm (plus_to_space v) with
+                 | [] -> [""] | l -> l) in
         loop (n::acc) tl
       | [k]::tl ->
         let n = plus_to_space k, [] in
@@ -308,7 +321,7 @@ module Query = struct
       | []::tl -> loop (("", [])::acc) tl
       | [] -> acc
     in loop []
-    (List.rev_map (fun el -> Re_str.bounded_split_delim qs_eq el 2) els)
+      (List.rev_map (fun el -> Re_str.bounded_split_delim qs_eq el 2) els)
 
   (* Make a query tuple list from a percent-encoded string *)
   let query_of_encoded qs =
@@ -319,20 +332,20 @@ module Query = struct
   (* Assemble a query string suitable for putting into a URI.
    * Tuple inputs are percent decoded and will be encoded by
    * this function.
-   *)
+  *)
   let encoded_of_query l =
     let len = List.fold_left (fun a (k,v) ->
-      a + (String.length k)
-      + (List.fold_left (fun a s -> a+(String.length s)+1) 0 v) + 2) (-1) l in
+        a + (String.length k)
+        + (List.fold_left (fun a s -> a+(String.length s)+1) 0 v) + 2) (-1) l in
     let buf = Buffer.create len in
     iter_concat (fun buf (k,v) ->
-      Buffer.add_string buf (pct_encode ~component:`Query_key k);
-      if v <> [] then (
-        Buffer.add_char buf '=';
-        iter_concat (fun buf s ->
-          Buffer.add_string buf (pct_encode ~component:`Query_value s)
-        ) "," buf v)
-    ) "&" buf l;
+        Buffer.add_string buf (pct_encode ~component:`Query_key k);
+        if v <> [] then (
+          Buffer.add_char buf '=';
+          iter_concat (fun buf s ->
+              Buffer.add_string buf (pct_encode ~component:`Query_value s)
+            ) "," buf v)
+      ) "&" buf l;
     Buffer.contents buf
 end
 
@@ -340,16 +353,17 @@ let query_of_encoded = Query.query_of_encoded
 let encoded_of_query = Query.encoded_of_query
 
 (* Type of the URI, with most bits being optional
- *)
+*) 
+
 type t = {
-  scheme: Pct.decoded option;
-  userinfo: Pct.decoded option;
-  host: Pct.decoded option;
-  port: int option;
+  scheme: Pct.decoded sexp_option;
+  userinfo: Pct.decoded sexp_option;
+  host: Pct.decoded sexp_option;
+  port: int sexp_option;
   path: Pct.decoded;
   query: Query.t;
-  fragment: Pct.decoded option;
-}
+  fragment: Pct.decoded sexp_option;
+} with sexp
 
 let normalize schem uri =
   let uncast_opt = function
@@ -366,14 +380,14 @@ let normalize schem uri =
     | Some x -> Some (Pct.unlift_decoded f x)
     | None -> None
   in {uri with
-    scheme=dob String.lowercase uri.scheme;
-    host=cast_opt (Scheme.normalize_host (uncast_opt uri.host))
-  }
+      scheme=dob String.lowercase uri.scheme;
+      host=cast_opt (Scheme.normalize_host (uncast_opt uri.host))
+     }
 
 (* Make a URI record. This is a bit more inefficient than it needs to be due to the
  * casting/uncasting (which isn't fully identity due to the option box), but it is
  * no big deal for now.
- *)
+*)
 let make ?scheme ?userinfo ?host ?port ?path ?query ?fragment () =
   let decode = function
     |Some x -> Some (Pct.cast_decoded x) |None -> None in
@@ -406,15 +420,15 @@ let of_string s =
     match get_opt subs 4 with
     |None -> None, None, None
     |Some a ->
-       let subs' = Re.exec Uri_re.authority (Pct.uncast_decoded a) in
-       let userinfo = get_opt subs' 1 in
-       let host = get_opt subs' 2 in
-       let port =
-         match get_opt subs' 3 with
-         |None -> None
-         |Some x -> (try Some (int_of_string (Pct.uncast_decoded x)) with _ -> None)
-       in
-       userinfo, host, port
+      let subs' = Re.exec Uri_re.authority (Pct.uncast_decoded a) in
+      let userinfo = get_opt subs' 1 in
+      let host = get_opt subs' 2 in
+      let port =
+        match get_opt subs' 3 with
+        |None -> None
+        |Some x -> (try Some (int_of_string (Pct.uncast_decoded x)) with _ -> None)
+      in
+      userinfo, host, port
   in
   let path =
     match get_opt subs 5 with
@@ -431,7 +445,7 @@ let of_string s =
 
 (** Convert a URI structure into a percent-encoded string
     <http://tools.ietf.org/html/rfc3986#section-5.3>
- *)
+*)
 let to_string uri =
   let scheme = match uri.scheme with
     | Some s -> Some (Pct.uncast_decoded s)
@@ -443,38 +457,38 @@ let to_string uri =
   (match uri.scheme with
    |None -> ()
    |Some x ->
-      add_pct_string ~component:`Scheme x;
-      Buffer.add_char buf ':'
+     add_pct_string ~component:`Scheme x;
+     Buffer.add_char buf ':'
   );
   (match uri.host with
    |Some host ->
-      Buffer.add_string buf "//";
-      (match uri.userinfo with
-       |None -> ()
-       |Some userinfo ->
-          add_pct_string ~component:`Userinfo userinfo;
-          Buffer.add_char buf '@'
-      );
-      add_pct_string ~component:`Host host;
-      (match uri.port with
-       |None -> ()
-       |Some port ->
-         Buffer.add_char buf ':';
-         Buffer.add_string buf (string_of_int port)
-      );
+     Buffer.add_string buf "//";
+     (match uri.userinfo with
+      |None -> ()
+      |Some userinfo ->
+        add_pct_string ~component:`Userinfo userinfo;
+        Buffer.add_char buf '@'
+     );
+     add_pct_string ~component:`Host host;
+     (match uri.port with
+      |None -> ()
+      |Some port ->
+        Buffer.add_char buf ':';
+        Buffer.add_string buf (string_of_int port)
+     );
    |None -> ()
   );
   (match Pct.uncast_decoded uri.path with
-    |"" ->
-      (* If the buffer has no host, then always start URI with a slash *)
-      (*if uri.host = None then Buffer.add_char buf '/'*) ()
-    |path when path.[0] = '/' ->
-      (* Path starts with a slash, so ok to add *)
-      add_pct_string ~component:`Path uri.path;
-    |path ->
-      (* Path has no starting slash and is non-empty, so force a starting slash *)
-      (*Buffer.add_char buf '/';*)
-      add_pct_string ~component:`Path uri.path;
+   |"" ->
+     (* If the buffer has no host, then always start URI with a slash *)
+     (*if uri.host = None then Buffer.add_char buf '/'*) ()
+   |path when path.[0] = '/' ->
+     (* Path starts with a slash, so ok to add *)
+     add_pct_string ~component:`Path uri.path;
+   |path ->
+     (* Path has no starting slash and is non-empty, so force a starting slash *)
+     (*Buffer.add_char buf '/';*)
+     add_pct_string ~component:`Path uri.path;
   );
   (match uri.query with
    |[] -> ()
@@ -543,8 +557,8 @@ let path_and_query uri =
 (* Subroutine for resolve <http://tools.ietf.org/html/rfc3986#section-5.2.3> *)
 let merge base rpath =
   match host base, path base with
-    | Some _, "" -> Pct.cast_decoded ("/"^rpath)
-    | _, bpath -> Pct.cast_decoded begin
+  | Some _, "" -> Pct.cast_decoded ("/"^rpath)
+  | _, bpath -> Pct.cast_decoded begin
       try (String.sub bpath 0 (1+(String.rindex bpath '/')))^rpath
       with Not_found -> rpath
     end
@@ -563,11 +577,11 @@ let remove_dot_segments p =
     | "/"::[] | [] when List.(length inp > 0 && hd inp = "/") ->
       "/" ^ (String.concat "" outp)
     | [] when ascension > 0 -> String.concat ""
-      ((String.concat "/" Array.(to_list (make ascension ".."))
-        ^ "/") :: outp)
+                                 ((String.concat "/" Array.(to_list (make ascension ".."))
+                                   ^ "/") :: outp)
     | [] -> String.concat "" List.(
-      if length outp > 0 && hd outp = "/"
-      then tl outp else outp)
+        if length outp > 0 && hd outp = "/"
+        then tl outp else outp)
     | "/"::s::r when ascension > 0 -> loop (ascension - 1) outp r
     | s::r -> loop 0 (s::outp) r
   in Pct.cast_decoded (loop 0 [] revp)
@@ -575,23 +589,23 @@ let remove_dot_segments p =
 (* Resolve a URI wrt a base URI <http://tools.ietf.org/html/rfc3986#section-5.2> *)
 let resolve schem base uri =
   let schem = Some (Pct.cast_decoded (match scheme base with
-    | None ->  schem
-    | Some scheme -> scheme
-  )) in
+      | None ->  schem
+      | Some scheme -> scheme
+    )) in
   normalize schem
     begin match scheme uri, host uri with
-    | Some _, _ ->
-      {uri with path=remove_dot_segments uri.path}
-    | None, Some _ ->
-      {uri with scheme=base.scheme; path=remove_dot_segments uri.path}
-    | None, None ->
-      let uri = {uri with scheme=base.scheme; host=base.host; port=base.port} in
-      if (path uri)=""
-      then {uri with path=base.path;
-        query=if uri.query=[] then base.query else uri.query}
-      else if (path uri).[0]='/'
-      then {uri with path=remove_dot_segments uri.path}
-      else {uri with path=remove_dot_segments (merge base (path uri))}
+      | Some _, _ ->
+        {uri with path=remove_dot_segments uri.path}
+      | None, Some _ ->
+        {uri with scheme=base.scheme; path=remove_dot_segments uri.path}
+      | None, None ->
+        let uri = {uri with scheme=base.scheme; host=base.host; port=base.port} in
+        if (path uri)=""
+        then {uri with path=base.path;
+                       query=if uri.query=[] then base.query else uri.query}
+        else if (path uri).[0]='/'
+        then {uri with path=remove_dot_segments uri.path}
+        else {uri with path=remove_dot_segments (merge base (path uri))}
     end
 
 let pp_hum ppf uri = Format.fprintf ppf "%s" (to_string uri)
