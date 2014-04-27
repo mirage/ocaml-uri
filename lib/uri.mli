@@ -125,14 +125,22 @@ val path : t -> string
 val path_and_query : t -> string
 
 (** Replace the path URI with the supplied encoded path.
-  * Input URI is not modified *)
+    Input URI is not modified *)
 val with_path : t -> string -> t
 
 (** Get the scheme component of a URI *)
 val scheme : t -> string option
 
+(** Replace the scheme portion of the URI with the supplied [scheme].
+    Input URI is not modified *)
+val with_scheme : t -> string option -> t
+
 (** Get the userinfo component of a URI *)
 val userinfo : t -> string option
+
+(** Replace the userinfo portion of the URI with the supplied [string option].
+    Input URI is not modified *)
+val with_userinfo : t -> string option -> t
 
 (** Get the host component of a URI *)
 val host : t -> string option
