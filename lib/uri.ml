@@ -158,10 +158,31 @@ module File : Scheme = struct
     | None -> Some ""
 end
 
+(** The "Form" scheme apes JavaScript's encodeUriComponent and
+    conservatively encodes quite a lot.  This is mainly for HTTP
+    POST forms.  See:
+    https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent
+  *)
+module Form : Scheme = struct
+  include Generic
+
+  let safe_chars_for_component _ =
+    let a = Array.create 256 false in
+    let subd = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()" in
+    for i = 0 to String.length subd - 1 do
+      let c = Char.code subd.[i] in
+      a.(c) <- true
+    done;
+    a
+
+  let normalize_host host = host
+end 
+
 let module_of_scheme = function
   | Some s -> begin match String.lowercase s with
       | "http" | "https" -> (module Http : Scheme)
       | "file" -> (module File : Scheme)
+      | "form" -> (module Form : Scheme)
       | _ -> (module Generic : Scheme)
     end
   | None -> (module Generic : Scheme)
