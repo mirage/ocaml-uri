@@ -1,5 +1,6 @@
 (*
- * Copyright (c) 2012 Anil Madhavapeddy <anil@recoil.org>
+ * Copyright (c) 2012-2014 Anil Madhavapeddy <anil@recoil.org>
+ * Copyright (c) 2012-2014 David Sheets <sheets@alum.mit.edu>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -398,7 +399,10 @@ module Query = struct
         loop (n::acc) tl
       | []::tl -> loop (("", [])::acc) tl
       | [] -> acc
-    in loop []
+    in
+    match els with
+    | []  -> ["",[]]
+    | els -> loop []
       (List.rev_map (fun el -> Stringext.split ~on:'=' el ~max:2) els)
 
   (* Make a query tuple list from a percent-encoded string *)
@@ -468,10 +472,19 @@ let normalize schem uri =
 let make ?scheme ?userinfo ?host ?port ?path ?query ?fragment () =
   let decode = function
     |Some x -> Some (Pct.cast_decoded x) |None -> None in
+  let host = match userinfo, host, port with
+    | _, Some _, _ | None, None, None -> host
+    | Some _, None, _ | _, None, Some _ -> Some ""
+  in
   let userinfo = match userinfo with
     | None -> None | Some u -> Some (userinfo_of_encoded u) in
   let path = match path with
-    |None -> [] | Some p -> path_of_encoded p in
+    |None -> [] | Some p ->
+      let path = path_of_encoded p in
+      match host, path with
+      | None, _ | Some _, "/"::_ | Some _, [] -> path
+      | Some _, _  -> "/"::path
+  in
   let query = match query with |None -> [] |Some p -> p in
   let scheme = decode scheme in
   normalize scheme
@@ -546,24 +559,27 @@ let to_string uri =
      add_pct_string ~component:`Scheme x;
      Buffer.add_char buf ':'
   );
+  (* URI has a host if any host-related component is set. Defaults to "". *)
+  if (match uri.userinfo, uri.host, uri.port with
+  | Some _, _, _ | _, Some _, _ | _, _, Some _ -> true | _ -> false)
+  then Buffer.add_string buf "//";
+  (match uri.userinfo with
+  |None -> ()
+  |Some userinfo ->
+    Buffer.add_string buf
+      (Pct.uncast_encoded (encoded_of_userinfo ?scheme userinfo));
+    Buffer.add_char buf '@'
+  );
   (match uri.host with
-   |Some host ->
-     Buffer.add_string buf "//";
-     (match uri.userinfo with
-      |None -> ()
-      |Some userinfo ->
-        Buffer.add_string buf
-          (Pct.uncast_encoded (encoded_of_userinfo ?scheme userinfo));
-        Buffer.add_char buf '@'
-     );
-     add_pct_string ~component:`Host host;
-     (match uri.port with
-      |None -> ()
-      |Some port ->
-        Buffer.add_char buf ':';
-        Buffer.add_string buf (string_of_int port)
-     );
-   |None -> ()
+  |None -> ()
+  |Some host ->
+    add_pct_string ~component:`Host host;
+  );
+  (match uri.port with
+  |None -> ()
+  |Some port ->
+    Buffer.add_char buf ':';
+    Buffer.add_string buf (string_of_int port)
   );
   (match uri.path with (* Handle relative paths correctly *)
   | [] -> ()
@@ -586,12 +602,6 @@ let to_string uri =
   );
   Buffer.contents buf
 
-(* Return the path component *)
-let path uri = Pct.uncast_encoded (match uri.scheme with
-  | None -> encoded_of_path uri.path
-  | Some s -> encoded_of_path ~scheme:(Pct.uncast_decoded s) uri.path)
-let with_path uri path = { uri with path=path_of_encoded path }
-
 (* Various accessor functions, as the external uri type is abstract  *)
 let get_decoded_opt = function None -> None |Some x -> Some (Pct.uncast_decoded x)
 let scheme uri = get_decoded_opt uri.scheme
@@ -606,11 +616,6 @@ let userinfo uri = match uri.userinfo with
     | None -> encoded_of_userinfo userinfo
     | Some s -> encoded_of_userinfo ~scheme:(Pct.uncast_decoded s) userinfo))
 
-let with_userinfo uri =
-  function
-  | Some u -> { uri with userinfo=Some (userinfo_of_encoded u) }
-  | None -> { uri with userinfo=None }
-
 let host uri = get_decoded_opt uri.host
 let with_host uri =
   function
@@ -622,8 +627,30 @@ let host_with_default ?(default="localhost") uri =
   |None -> default
   |Some h -> h
 
+let with_userinfo uri userinfo =
+  let userinfo = match userinfo with
+    | Some u -> Some (userinfo_of_encoded u)
+    | None -> None
+  in
+  match host uri with
+  | None -> { uri with host=Some (Pct.cast_decoded ""); userinfo=userinfo }
+  | Some _ -> { uri with userinfo=userinfo }
+
 let port uri = uri.port
-let with_port uri port = { uri with port=port }
+let with_port uri port =
+  match host uri with
+  | None -> { uri with host=Some (Pct.cast_decoded ""); port=port }
+  | Some _ -> { uri with port=port }
+
+(* Return the path component *)
+let path uri = Pct.uncast_encoded (match uri.scheme with
+  | None -> encoded_of_path uri.path
+  | Some s -> encoded_of_path ~scheme:(Pct.uncast_decoded s) uri.path)
+let with_path uri path =
+  let path = path_of_encoded path in
+  match host uri, path with
+  | None, _ | Some _, "/"::_ | Some _, [] -> { uri with path=path }
+  | Some _, _  -> { uri with path="/"::path }
 
 let fragment uri = get_decoded_opt uri.fragment
 let with_fragment uri =

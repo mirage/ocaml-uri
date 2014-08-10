@@ -114,6 +114,10 @@ val add_query_params' : t -> (string * string) list -> t
   *)
 val remove_query_param : t -> string -> t
 
+(** Make a URI from supplied components. If userinfo or port are
+    supplied without host, an empty host is added. If path is supplied
+    and userinfo, host, or port is also supplied, path is made
+    absolute but not resolved. *)
 val make : ?scheme:string -> ?userinfo:string -> ?host:string ->
   ?port:int -> ?path:string -> ?query:(string * string list) list ->
   ?fragment:string -> unit -> t
@@ -125,6 +129,8 @@ val path : t -> string
 val path_and_query : t -> string
 
 (** Replace the path URI with the supplied encoded path.
+    If a host is present in the supplied URI, the path is made absolute but not
+    resolved. If the path is empty, the path component is removed.
     Input URI is not modified *)
 val with_path : t -> string -> t
 
@@ -139,7 +145,8 @@ val with_scheme : t -> string option -> t
 val userinfo : t -> string option
 
 (** Replace the userinfo portion of the URI with the supplied [string option].
-    Input URI is not modified *)
+    If no host is present in the supplied URI, an empty host is added.
+    Input URI is not modified. *)
 val with_userinfo : t -> string option -> t
 
 (** Get the host component of a URI *)
@@ -157,7 +164,8 @@ val host_with_default: ?default:string -> t -> string
 val port : t -> int option
 
 (** Replace the port component of the URI with the supplied port.
-    Input URI is not modified *)
+    If no host is present in the supplied URI, an empty host is added.
+    Input URI is not modified. *)
 val with_port : t -> int option -> t
 
 (** Get the fragment component of a URI *)
