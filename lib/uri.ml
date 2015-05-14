@@ -102,11 +102,9 @@ module Generic : Scheme = struct
     a.(Char.code '+') <- true;
     a
 
-  (** Safe characters for the path component of a URI
-      TODO: sometimes ':' is unsafe (Sec 3.3 pchar vs segment-nz-nc) *)
+  (** Safe characters for the path component of a URI *)
   let safe_chars_for_path : safe_chars =
-    let a = sub_delims (Array.copy safe_chars) in
-    a.(Char.code '@') <- true;
+    let a = sub_delims (Array.copy pchar) in
     (* delimiter: non-segment delimiting uses should be pct encoded *)
     a.(Char.code '/') <- false;
     a
@@ -175,10 +173,16 @@ module File : Scheme = struct
     | None -> Some ""
 end
 
+module Urn : Scheme = struct
+  include Generic
+
+end
+
 let module_of_scheme = function
   | Some s -> begin match String.lowercase s with
       | "http" | "https" -> (module Http : Scheme)
       | "file" -> (module File : Scheme)
+      | "urn"  -> (module Urn : Scheme)
       | _ -> (module Generic : Scheme)
     end
   | None -> (module Generic : Scheme)
@@ -475,6 +479,16 @@ type t = {
   fragment: Pct.decoded sexp_option;
 } with sexp
 
+let empty = {
+  scheme = None;
+  userinfo = None;
+  host = None;
+  port = None;
+  path = [];
+  query = [];
+  fragment = None;
+}
+
 let compare_decoded = Pct.unlift_decoded2 String.compare
 let compare_decoded_opt = compare_opt compare_decoded
 let compare t t' =
@@ -633,8 +647,17 @@ let to_string uri =
   | [] -> ()
   | "/"::_ ->
     Buffer.add_string buf (Pct.uncast_encoded (encoded_of_path ?scheme uri.path))
-  | _ ->
-    (if uri.host <> None then Buffer.add_char buf '/');
+  | first_segment::_ ->
+    (match uri.host with
+     | Some _ -> Buffer.add_char buf '/'
+     | None ->
+       (* ensure roundtrip by forcing relative path interpretation not scheme *)
+       match Stringext.find_from first_segment ~pattern:":" with
+       | None -> ()
+       | Some _ -> match scheme with
+         | Some _ -> ()
+         | None -> Buffer.add_string buf "./"
+    );
     Buffer.add_string buf
       (Pct.uncast_encoded (encoded_of_path ?scheme uri.path))
   );

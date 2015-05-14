@@ -68,11 +68,13 @@ let uri_encodes = [
   "http://user:pass@%5B2001%3A41d1%3Afe67%3A500%3A227%3Ac6ff%3Afe5a%3Aefa0%25wlan0%5D:6789/wh/at/ever?foo=1&bar=5#5",
   (Uri.make ~scheme:"http" ~userinfo:"user:pass" ~host:"[2001:41d1:fe67:500:227:c6ff:fe5a:efa0%wlan0]"
      ~port:6789 ~path:"/wh/at/ever" ~query:["foo",["1"];"bar",["5"]] ~fragment:"5" ());
-  "foo+bar%3A", (Uri.make ~path:"foo+bar:" ());
+  "foo+bar:", (Uri.make ~scheme:"foo+bar" ());
   "foo+bar:///", (Uri.make ~scheme:"foo+bar" ~host:"" ~path:"/" ());
   "foo2-bar.baz:///", (Uri.make ~scheme:"foo2-bar.baz" ~host:"" ~path:"/" ());
   "//foobar.com/quux", (Uri.make ~host:"foobar.com" ~path:"quux" ());
   "quux%2F%20", (Uri.make ~path:"quux%2f " ());
+  "urn:uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6",
+  (Uri.make ~scheme:"urn" ~path:"uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6" ());
 ]
 
 let map_pcts_tests size name test args =
@@ -230,8 +232,7 @@ let file_uri_rel_res = [ (* http://tools.ietf.org/html/rfc1738#section-3.10 *)
 let test_file_rel_res =
   List.map (fun (rel,abs) ->
     let test () = assert_equal ~printer:(fun l -> l)
-      abs (Uri.to_string (Uri.resolve "file" (Uri.of_string "")
-                            (Uri.of_string rel))) in
+      abs (Uri.to_string (Uri.resolve "file" Uri.empty (Uri.of_string rel))) in
     rel >:: test
   ) file_uri_rel_res
 
@@ -279,7 +280,7 @@ let test_rel_rel_res =
 
 let generic_uri_norm = [
   "HTTP://example.com/", "http://example.com/";
-  "http://example.com/%3a%3f", "http://example.com/%3A%3F";
+  "http://example.com/%3a%3f", "http://example.com/:%3F";
   "http://Example.Com/", "http://example.com/";
   "http://example.com/%68%65%6c%6c%6f", "http://example.com/hello";
   "http://example.com/../", "http://example.com/";
@@ -297,6 +298,7 @@ let generic_uri_norm = [
   "//colon%3Auser:colon%3Apassword@example.net/";
   "//colon%3Auser@example.net/",
   "//colon%3Auser@example.net/";
+  "foo+bar%3a", "./foo+bar:";
   (let p_q = "/foo%20bar/" in
    p_q, Uri.(path_and_query (of_string p_q)));
 ]
@@ -304,8 +306,7 @@ let generic_uri_norm = [
 let test_generic_uri_norm =
   List.map (fun (o,n) ->
     let test () = assert_equal ~printer:(fun l -> l)
-      n (Uri.to_string (Uri.resolve "http" (Uri.of_string "")
-                          (Uri.of_string o))) in
+      n (Uri.to_string (Uri.resolve "http" Uri.empty (Uri.of_string o))) in
     o >:: test
   ) generic_uri_norm
 
@@ -388,12 +389,22 @@ let test_with_change =
     let exp = "f%20o%20o://foo.bar/a/b/c" in
     let msg = sprintf "%s <> %s" (Uri.to_string uri3) exp in
     assert_equal ~msg (Uri.to_string uri3) exp;
-    let uri_empty = Uri.of_string "" in
-    let uri = Uri.with_scheme uri_empty (Some "http") in
+
+    let uri = Uri.with_scheme Uri.empty (Some "http") in
     let uri_s = Uri.to_string uri in
-    let uri_exp = "http://" in
+    let uri_exp = "http:" in
     let msg = sprintf "with_scheme empty (%s <> %s).string" uri_s uri_exp in
-    assert_equal ~msg uri_s uri_exp
+    assert_equal ~msg uri_s uri_exp;
+
+    let urn = Uri.of_string "urn:uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6" in
+    let urn2= Uri.with_scheme urn (Some "urn") in
+    assert_equal urn urn2;
+
+    let urn_path =
+      Uri.with_path Uri.empty "uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
+    in
+    let urn2 = Uri.with_scheme urn_path (Some "urn") in
+    assert_equal urn urn2
   );
 
   "test_with_userinfo" >:: (fun () ->
@@ -407,8 +418,7 @@ let test_with_change =
     let msg t = sprintf "%s %s <> %s" t (Uri.to_string uri3) exp in
     assert_equal ~msg:(msg "string") (Uri.to_string uri3) exp;
     assert_equal ~msg:(msg "rep") uri3 (Uri.of_string exp);
-    let uri = Uri.of_string "" in
-    let uri_some = Uri.with_userinfo uri (Some "avsm") in
+    let uri_some = Uri.with_userinfo Uri.empty (Some "avsm") in
     let exp = "//avsm@" in
     let msg t = sprintf "%s %s <> %s" t (Uri.to_string uri_some) exp in
     assert_equal ~msg:(msg "string") (Uri.to_string uri_some) exp;
@@ -430,14 +440,12 @@ let test_with_change =
     let uri_some = Uri.with_host uri (Some "www.woof.com") in
     let uri_woof = Uri.of_string "//www.woof.com" in
     assert_equal ~msg:"host change" uri_woof uri_some;
-    let uri = Uri.of_string "" in
-    let uri_some = Uri.with_host uri (Some "www.woof.com") in
+    let uri_some = Uri.with_host Uri.empty (Some "www.woof.com") in
     assert_equal ~msg:"create host" uri_woof uri_some
   );
 
   "test_with_port" >:: (fun () ->
-    let uri = Uri.of_string "" in
-    let uri_port = Uri.with_port uri (Some 80) in
+    let uri_port = Uri.with_port Uri.empty (Some 80) in
     let uri_exp = "//:80" in
     let msg = sprintf "add port to empty (%s <> %s)"
       uri_exp (Uri.to_string uri_port) in
@@ -454,14 +462,13 @@ let test_with_change =
   );
 
   "test_with_path" >:: (fun () ->
-    let uri = Uri.of_string "" in
-    let uri_empty = Uri.with_path uri "" in
-    assert_equal ~msg:"empty host empty path" uri uri_empty;
-    let uri_pct = Uri.with_path uri "%2F" in
+    let uri_empty = Uri.with_path Uri.empty "" in
+    assert_equal ~msg:"empty host empty path" Uri.empty uri_empty;
+    let uri_pct = Uri.with_path Uri.empty "a%2F" in
     let msg = sprintf "empty host percent / path (%s <> %s)"
-      (Uri.to_string uri_pct) "%2F" in
-    assert_equal ~msg (Uri.to_string uri_pct) "%2F";
-    let uri_some = Uri.with_path uri "a" in
+      (Uri.to_string uri_pct) "a%2F" in
+    assert_equal ~msg (Uri.to_string uri_pct) "a%2F";
+    let uri_some = Uri.with_path Uri.empty "a" in
     assert_equal ~msg:"empty host some path" (Uri.of_string "a") uri_some;
     let uri = Uri.of_string "//" in
     let uri_empty = Uri.with_path uri "" in
@@ -503,7 +510,7 @@ let test_with_change =
       assert_equal ~msg (Uri.of_string prefix) uri_empty;
       let uri_equal = Uri.with_query' uri ["",""] in
       let msg = prefix ^" equal'" in
-      assert_equal (Uri.of_string (prefix^"?=")) uri_equal;
+      assert_equal ~msg (Uri.of_string (prefix^"?=")) uri_equal;
     in
     test_with_query "";
     test_with_query "//";
@@ -514,7 +521,6 @@ let test_with_change =
     assert_equal ~msg (Uri.of_string "//?#") uri_quest;
     let uri_equal = Uri.with_query' uri ["",""] in
     let uri_exp_s = "//?=#" in
-    let uri_exp = Uri.of_string uri_exp_s in
     let msg = sprintf "%s <> %s" uri_exp_s (Uri.to_string uri_equal) in
     assert_equal ~msg (Uri.of_string "//?=#") uri_equal;
   );
@@ -549,7 +555,23 @@ let rec was_successful =
         false
 
 let _ =
-  let suite = "URI" >::: (test_pct_small @ test_pct_large @ test_uri_encode @ test_uri_decode @ test_query_decode @ test_query_encode @ test_rel_res @ test_file_rel_res @ test_rel_rel_res @ test_generic_uri_norm @ test_rel_id @ test_tcp_port_of_uri @ query_key_add_remove @ test_sexping @ test_with_change) in
+  let suite = "URI" >::: (
+    test_pct_small
+    @ test_pct_large
+    @ test_uri_encode
+    @ test_uri_decode
+    @ test_query_decode
+    @ test_query_encode
+    @ test_rel_res
+    @ test_file_rel_res
+    @ test_rel_rel_res
+    @ test_generic_uri_norm
+    @ test_rel_id
+    @ test_tcp_port_of_uri
+    @ query_key_add_remove
+    @ test_sexping
+    @ test_with_change
+  ) in
   let verbose = ref false in
   let set_verbose _ = verbose := true in
   Arg.parse
