@@ -632,13 +632,12 @@ let aws_encode_val =
     Buffer.contents b
 
 let aws_encode kv =
-  kv
-  |> List.map (fun (x, y) -> x ^ "=" ^ aws_encode_val y)
-  |> String.concat "&"
+  let kvs = List.map (fun (x, y) -> x ^ "=" ^ aws_encode_val y) kv in
+  String.concat "&" kvs
 
 let test_aws_encode =
   let f q =
-    let query = q |> List.map (fun (k, v) -> (k, [v])) in
+    let query = List.map (fun (k, v) -> (k, [v])) q in
     let u = Uri.make ~encoding:"aws" ~query () in
     Uri.path_and_query u
   in
