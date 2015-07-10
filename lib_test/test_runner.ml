@@ -639,7 +639,7 @@ let aws_encode kv =
 let test_aws_encode =
   let f q =
     let query = q |> List.map (fun (k, v) -> (k, [v])) in
-    let u = Uri.make ~query_scheme:"aws" ~query () in
+    let u = Uri.make ~encoding:"aws" ~query () in
     Uri.path_and_query u
   in
   let test q =

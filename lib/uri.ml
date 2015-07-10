@@ -525,7 +525,7 @@ let encoded_of_query ?scheme = Query.encoded_of_query ?scheme
 
 (* Type of the URI, with most bits being optional *)
 type t = {
-  query_scheme: Pct.decoded sexp_option;
+  encoding: Pct.decoded sexp_option;
   scheme: Pct.decoded sexp_option;
   userinfo: Userinfo.t sexp_option;
   host: Pct.decoded sexp_option;
@@ -536,7 +536,7 @@ type t = {
 } with sexp
 
 let empty = {
-  query_scheme = None;
+  encoding = None;
   scheme = None;
   userinfo = None;
   host = None;
@@ -590,7 +590,7 @@ let normalize schem uri =
  * casting/uncasting (which isn't fully identity due to the option box), but it is
  * no big deal for now.
 *)
-let make ?query_scheme ?scheme ?userinfo ?host ?port ?path ?query ?fragment () =
+let make ?encoding ?scheme ?userinfo ?host ?port ?path ?query ?fragment () =
   let decode = function
     |Some x -> Some (Pct.cast_decoded x) |None -> None in
   let host = match userinfo, host, port with
@@ -611,9 +611,9 @@ let make ?query_scheme ?scheme ?userinfo ?host ?port ?path ?query ?fragment () =
     | Some p -> Query.KV p
   in
   let scheme = decode scheme in
-  let query_scheme = decode query_scheme in
+  let encoding = decode encoding in
   normalize scheme
-    { scheme ; query_scheme ; userinfo ; host=decode host ; port ; path
+    { scheme ; encoding ; userinfo ; host=decode host ; port ; path
     ; query ; fragment=decode fragment }
 
 (** Parse a URI string into a structure *)
@@ -664,8 +664,8 @@ let of_string s =
     | None -> Query.Raw (None, Lazy.from_val [])
   in
   let fragment = get_opt subs 9 in
-  normalize scheme { query_scheme=None ; scheme ; userinfo ; host ; port
-                   ; path ; query ; fragment }
+  normalize scheme { scheme ; userinfo ; host ; port ; path
+                   ; query ; fragment ; encoding=None }
 
 (** Convert a URI structure into a percent-encoded string
     <http://tools.ietf.org/html/rfc3986#section-5.3>
@@ -708,7 +708,7 @@ let to_string uri =
     Buffer.add_string buf (string_of_int port)
   );
   let scheme =
-    match uri.query_scheme with
+    match uri.encoding with
     | None -> scheme
     | Some s -> Some (Pct.uncast_decoded s) in
   (match uri.path with (* Handle relative paths correctly *)
@@ -749,10 +749,10 @@ let with_scheme uri =
   |Some scheme -> { uri with scheme=Some (Pct.cast_decoded scheme) }
   |None -> { uri with scheme=None }
 
-let with_query_scheme uri =
+let with_encoding uri =
   function
-  |Some scheme -> { uri with query_scheme=Some (Pct.cast_decoded scheme) }
-  |None -> { uri with query_scheme=None }
+  |Some encoding -> { uri with encoding=Some (Pct.cast_decoded encoding) }
+  |None -> { uri with encoding=None }
 
 let host uri = get_decoded_opt uri.host
 let with_host uri =
@@ -847,21 +847,16 @@ let remove_query_param uri k = Query.(
   { uri with query=KV (List.filter (fun (k',_) -> k<>k') (kv uri.query)) }
 )
 
-let q_scheme uri =
-  match uri.query_scheme with
-  | None -> uri.scheme
-  | t -> t
-
 (* Construct encoded path and query components *)
 let path_and_query uri =
   match (path uri), (query uri) with
   |"", [] -> "/" (* TODO: What about same document? (/) *)
   |"", q -> (* TODO: What about same document? (/) *)
-    let scheme = uncast_opt (q_scheme uri) in
+    let scheme = uncast_opt uri.encoding in
     Printf.sprintf "/?%s" (encoded_of_query ?scheme q)
   |p, [] -> p
   |p, q ->
-    let scheme = uncast_opt (q_scheme uri) in
+    let scheme = uncast_opt uri.encoding in
     Printf.sprintf "%s?%s" p (encoded_of_query ?scheme q)
 
 (* TODO: functions to add and remove from a URI *)
