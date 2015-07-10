@@ -744,6 +744,7 @@ let to_string uri =
 (* Various accessor functions, as the external uri type is abstract  *)
 let get_decoded_opt = function None -> None |Some x -> Some (Pct.uncast_decoded x)
 let scheme uri = get_decoded_opt uri.scheme
+let encoding uri = get_decoded_opt uri.encoding
 let with_scheme uri =
   function
   |Some scheme -> { uri with scheme=Some (Pct.cast_decoded scheme) }
@@ -826,7 +827,7 @@ let query uri = Query.kv uri.query
 let verbatim_query uri = Query.(match uri.query with
   | Raw (qs,_) -> qs
   | KV [] -> None
-  | KV kv -> Some (encoded_of_query ?scheme:(scheme uri) kv)
+  | KV kv -> Some (encoded_of_query ?scheme:(encoding uri) kv)
 )
 let get_query_param' uri k = Query.(find (kv uri.query) k)
 let get_query_param uri k =
