@@ -79,7 +79,7 @@ val canonicalize : t -> t
     supplied without host, an empty host is added. If path is supplied
     and userinfo, host, or port is also supplied, path is made
     absolute but not resolved. *)
-val make : ?scheme:string -> ?userinfo:string -> ?host:string ->
+val make : ?query_scheme:string -> ?scheme:string -> ?userinfo:string -> ?host:string ->
   ?port:int -> ?path:string -> ?query:(string * string list) list ->
   ?fragment:string -> unit -> t
 
@@ -191,6 +191,8 @@ val scheme : t -> string option
 (** Replace the scheme portion of the URI with the supplied [scheme].
     Input URI is not modified *)
 val with_scheme : t -> string option -> t
+
+val with_query_scheme : t -> string option -> t
 
 (** Get the userinfo component of a URI *)
 val userinfo : t -> string option
