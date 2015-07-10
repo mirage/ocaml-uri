@@ -236,7 +236,7 @@ let module_of_scheme = function
   * defines abstract Pct.encoded and Pct.decoded types which sets the
   * state of the underlying string.  There are functions to "cast" to
   * and from these and normal strings, and this promotes a bit of
-  * internal safety.  These types are not exposed to the externa
+  * internal safety.  These types are not exposed to the external
   * interface, as casting to-and-from is quite a bit of hassle and
   * probably not a lot of use to the average consumer of this library
 *)

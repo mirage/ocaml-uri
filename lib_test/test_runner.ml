@@ -646,11 +646,12 @@ let test_aws_encode =
     let q' = "/?" ^ aws_encode q in
     (q, q')
   in
-  [ test ["q","*"]
-  ; test ["q","star wars"; "q.options", "{fields: ['title^5.0','description']}"]
-  ] |> List.map (fun (in_, out) ->
-    out >:: (fun () -> assert_equal ~printer:(fun x -> x) out (f in_))
-  )
+  List.map (fun (in_, out) ->
+    out >:: (fun () -> assert_equal ~printer:(fun x -> x) out (f in_)))
+  [ test [ "q","*" ]
+  ; test [ "q","star wars"
+         ; "q.options", "{fields: ['title^5.0','description']}"]
+  ]
 
 (* Returns true if the result list contains successes only.
    Copied from oUnit source as it isnt exposed by the mli *)
