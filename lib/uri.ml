@@ -213,10 +213,6 @@ module Aws : Scheme = struct
     | `Query_key -> safe_chars_query_key
     | `Query_value -> Generic.safe_chars
     | `Query -> Http.safe_chars_for_component `Query
-    | `Path
-    | `Userinfo
-    | `Fragment
-    | `Scheme -> failwith "Aws scheme is only for query encoding"
     | x -> Http.safe_chars_for_component x
 end
 
