@@ -20,8 +20,8 @@ Flag allservices
 Library uri
   Path:       lib
   Modules:    Uri,Uri_re
-  BuildDepends: re.posix,stringext,sexplib,ppx_sexp_conv
-  XMETARequires: re.posix,stringext,sexplib
+  BuildDepends: tyre,re.posix,stringext,sexplib,ppx_sexp_conv
+  XMETARequires: tyre,re.posix,stringext,sexplib
 
 Library services
   Path:       lib
@@ -74,4 +74,3 @@ Test test_runner
   Run$:               flag(tests)
   Command:            $test_runner
   WorkingDirectory:   lib_test
-
