@@ -34,6 +34,7 @@ remove: [
 depends: [
   "ocamlfind" {build}
   "re"
+  "tyre" 
   "sexplib" {>= "109.53.00"}
   "ppx_sexp_conv"
   "base-bytes"
