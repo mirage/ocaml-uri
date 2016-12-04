@@ -1,4 +1,4 @@
-PKG re
+PKG re tyre
 PKG re.posix
 PKG stringext
 PKG sexplib

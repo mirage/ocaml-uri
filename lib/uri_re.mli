@@ -17,6 +17,11 @@
 
 (** Regular expressions for URI parsing. *)
 
+module Raw : sig
+  val userinfo : Re.t
+  val host : Re.t
+end
+
 val ipv4_address : Re.re
 val ipv6_address : Re.re
 val uri_reference : Re.re

@@ -598,55 +598,94 @@ let make ?scheme ?userinfo ?host ?port ?path ?query ?fragment () =
     { scheme; userinfo;
       host=decode host; port; path; query; fragment=decode fragment }
 
+module Typedre = struct
+  open Tyre
+
+  let encoded =
+    conv Pct.cast_encoded Pct.uncast_encoded
+
+  let decode = conv (fun s -> Pct.decode s) Pct.encode
+  let posix s = encoded @@ regex @@ Re_posix.re s
+
+  let scheme =
+    posix "[^:/?#]+" <* char ':'
+    |> decode
+
+  let userinfo : Userinfo.t t =
+    let to_ x = Userinfo.userinfo_of_encoded (Pct.uncast_encoded x) in
+    let of_ x = encoded_of_userinfo (*?scheme*) x in
+    regex Uri_re.Raw.userinfo <* char '@'
+    |> encoded
+    |> conv to_ of_
+
+  let host =
+    regex (Uri_re.Raw.host)
+    |> encoded
+    |> decode
+
+  let port =
+    let flatten =
+      conv (function Some x -> x | None -> None) (fun x -> Some x)
+    in
+    char ':' *> opt pos_int
+    |> opt |> flatten
+
+  let authority =
+    str "//" *> opt userinfo <&> host <&> port
+    |> opt
+
+  let path : Path.t t =
+    let to_ x = Path.path_of_encoded (Pct.uncast_encoded x) in
+    let of_ x = encoded_of_path (*?scheme*) x in
+    posix "[^?#]*"
+    |> conv to_ of_
+
+  let query : Query.t t =
+    let to_ = function
+      | Some x -> Query.of_raw (Pct.uncast_encoded x)
+      | None -> Query.Raw (None, Lazy.from_val [])
+    in
+    let of_ = function
+    | Query.Raw (None,_) | KV [] -> None
+    | Raw (_,lazy q) | KV q ->
+      Some (Pct.cast_encoded (encoded_of_query (*?scheme*) q))
+    in
+    opt (char '?' *> posix "[^#]*")
+    |> conv to_ of_
+
+  let fragment =
+    char '#' *> posix ".*"
+    |> decode
+
+  let uri_raw =
+    opt scheme <&> authority
+    <&> path
+    <&> query
+    <&> opt fragment
+
+    |> longest
+
+  let uri =
+    let to_ ((((scheme, authority), path), query), fragment) =
+      let userinfo, host, port = match authority with
+        | None -> None, None, None
+        | Some ((u, h), p) -> u, Some h, p
+      in
+      normalize scheme
+        { scheme; userinfo; host; port; path; query; fragment }
+    in
+    let of_ _ = assert false in
+    conv to_ of_ uri_raw
+
+end
+
+let re = Tyre.compile @@ Tyre.whole_string Typedre.uri
+
 (** Parse a URI string into a structure *)
 let of_string s =
-  (* Given a series of Re substrings, cast each component
-   * into a Pct.encoded and return an optional type (None if
-   * the component is not present in the Uri *)
-  let get_opt_encoded s n =
-    try Some (Pct.cast_encoded (Re.get s n))
-    with Not_found -> None
-  in
-  let get_opt s n =
-    try
-      let pct = Pct.cast_encoded (Re.get s n) in
-      Some (Pct.decode pct)
-    with Not_found -> None
-  in
-  let subs = Re.exec Uri_re.uri_reference s in
-  let scheme = get_opt subs 2 in
-  let userinfo, host, port =
-    match get_opt_encoded subs 4 with
-    |None -> None, None, None
-    |Some a ->
-      let subs' = Re.exec Uri_re.authority (Pct.uncast_encoded a) in
-      let userinfo = match get_opt_encoded subs' 1 with
-        | Some x -> Some (Userinfo.userinfo_of_encoded (Pct.uncast_encoded x))
-        | None -> None
-      in
-      let host = get_opt subs' 2 in
-      let port =
-        match get_opt subs' 3 with
-        |None -> None
-        |Some x ->
-          (try
-             Some (int_of_string (Pct.uncast_decoded x))
-           with _ -> None)
-      in
-      userinfo, host, port
-  in
-  let path =
-    match get_opt_encoded subs 5 with
-    | Some x -> Path.path_of_encoded (Pct.uncast_encoded x)
-    | None -> []
-  in
-  let query =
-    match get_opt_encoded subs 7 with
-    | Some x -> Query.of_raw (Pct.uncast_encoded x)
-    | None -> Query.Raw (None, Lazy.from_val [])
-  in
-  let fragment = get_opt subs 9 in
-  normalize scheme { scheme; userinfo; host; port; path; query; fragment }
+  match Tyre.exec re s with
+  | Ok uri -> uri
+  | Error _ -> assert false
 
 (** Convert a URI structure into a percent-encoded string
     <http://tools.ietf.org/html/rfc3986#section-5.3>
