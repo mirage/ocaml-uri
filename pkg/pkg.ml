@@ -3,8 +3,12 @@
 #require "topkg"
 open Topkg
 
+let gen_service c =
+  OS.Cmd.run Cmd.(v "sh" % "etc/gen.sh")
+
 let () =
-  Pkg.describe "uri" @@ fun c ->
+  let build = Pkg.build ~pre:gen_service () in
+  Pkg.describe "uri" ~build @@ fun c ->
   Ok [ Pkg.mllib "lib/uri.mllib";
        Pkg.mllib "lib/services.mllib";
        Pkg.mllib "lib/services_full.mllib";
