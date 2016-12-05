@@ -4,7 +4,7 @@
 open Topkg
 
 let () =
-  Pkg.describe "io-page" @@ fun c ->
+  Pkg.describe "uri" @@ fun c ->
   Ok [ Pkg.mllib "lib/uri.mllib";
        Pkg.mllib "lib/services.mllib";
        Pkg.mllib "lib/services_full.mllib";
