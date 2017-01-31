@@ -1,8 +1,7 @@
 PKG re
 PKG re.posix
 PKG stringext
-PKG sexplib
-PKG sexplib.syntax
+PKG ppx_sexp_conv
 PKG oUnit
 B _build/lib
 B _build/lib_test

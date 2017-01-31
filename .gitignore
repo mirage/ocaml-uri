@@ -10,3 +10,4 @@ setup.bin
 *.annot
 lib/uri_services.ml
 lib/uri_services_full.ml
+*.install
