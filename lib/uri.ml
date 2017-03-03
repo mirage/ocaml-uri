@@ -65,84 +65,69 @@ let rec compare_list f t t' = match t, t' with
   * is being parsed, so there are multiple variants (and this
   * set is probably not exhaustive. TODO: check.
 *)
-type safe_chars = bool array
+
+module Safe_chars = struct
+  type t = bool array
+
+  let set_chars (t : t) chars ~v =
+    let t' = Array.copy t in
+    for i = 0 to String.length chars - 1 do
+      t'.(Char.code chars.[i]) <- v
+    done;
+    t'
+
+  let add_safe = set_chars ~v:true
+  let add_unsafe = set_chars ~v:false
+
+  let init_with_safe safe_string = add_safe (Array.make 256 false) safe_string
+end
 
 module type Scheme = sig
-  val safe_chars_for_component : component -> safe_chars
+  val safe_chars_for_component : component -> Safe_chars.t
   val normalize_host : string option -> string option
   val canonicalize_port : int option -> int option
   val canonicalize_path : string list -> string list
 end
 
 module Generic : Scheme = struct
-  let sub_delims a =
-    let subd = "!$&'()*+,;=" in
-    for i = 0 to String.length subd - 1 do
-      let c = Char.code subd.[i] in
-      a.(c) <- true
-    done;
-    a
+  let sub_delims safe_chars =
+    Safe_chars.add_safe safe_chars "!$&'()*+,;="
 
-  let safe_chars : safe_chars = 
-    let a = Array.make 256 false in
-    let always_safe =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-~" in
-    for i = 0 to String.length always_safe - 1 do
-      let c = Char.code always_safe.[i] in
-      a.(c) <- true
-    done;
-    a
+  let safe_chars : Safe_chars.t =
+    Safe_chars.init_with_safe
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-~"
 
-  let pchar : safe_chars =
-    let a = sub_delims (Array.copy safe_chars) in
-    a.(Char.code ':') <- true;
-    a.(Char.code '@') <- true;
-    a
+  let pchar : Safe_chars.t =
+    Safe_chars.add_safe (sub_delims safe_chars) ":@"
 
-  let safe_chars_for_scheme : safe_chars =
-    let a = Array.copy safe_chars in
-    a.(Char.code '+') <- true;
-    a
+  let safe_chars_for_scheme : Safe_chars.t =
+    Safe_chars.add_safe safe_chars "+"
 
   (** Safe characters for the path component of a URI *)
-  let safe_chars_for_path : safe_chars =
-    let a = sub_delims (Array.copy pchar) in
+  let safe_chars_for_path : Safe_chars.t =
     (* delimiter: non-segment delimiting uses should be pct encoded *)
-    a.(Char.code '/') <- false;
-    a
+    Safe_chars.add_unsafe (sub_delims pchar) "/"
 
-  let safe_chars_for_query : safe_chars =
+  let safe_chars_for_query : Safe_chars.t =
     (* TODO: What about {"!","$",","}? See <https://github.com/avsm/ocaml-uri/commit/1ef3f1dfb41bdb4f33f223ffe16e62a33975661a#diff-740f2de53c9eb36e9670ddfbdb9ba914R171> *)
-    let a = Array.copy pchar in
-    a.(Char.code '/') <- true;
-    a.(Char.code '?') <- true;
     (* '&' is safe but we should encode literals to avoid ambiguity
        with the already parsed qs params *)
-    a.(Char.code '&') <- false;
     (* ';' is safe but some systems treat it like '&'. *)
-    a.(Char.code ';') <- false;
-    a.(Char.code '+') <- false;
-    a
+    Safe_chars.(add_unsafe (add_safe pchar "/?") "&;+")
 
-  let safe_chars_for_query_key : safe_chars =
-    let a = Array.copy safe_chars_for_query in
-    a.(Char.code '=') <- false;
-    a
+  let safe_chars_for_query_key : Safe_chars.t =
+    Safe_chars.add_unsafe safe_chars_for_query "="
 
-  let safe_chars_for_query_value : safe_chars =
-    let a = Array.copy safe_chars_for_query in
-    a.(Char.code ',') <- false;
-    a
+  let safe_chars_for_query_value : Safe_chars.t =
+    Safe_chars.add_unsafe safe_chars_for_query ","
 
-  let safe_chars_for_fragment : safe_chars = safe_chars_for_query
+  let safe_chars_for_fragment : Safe_chars.t = safe_chars_for_query
 
   (** Safe characters for the userinfo subcomponent of a URI.
       TODO: this needs more reserved characters added *)
-  let safe_chars_for_userinfo : safe_chars =
-    let a = Array.copy safe_chars in
+  let safe_chars_for_userinfo : Safe_chars.t =
     (* delimiter: non-segment delimiting uses should be pct encoded *)
-    a.(Char.code ':') <- false;
-    a
+    Safe_chars.add_unsafe safe_chars ":"
 
   let safe_chars_for_component = function
     | `Path -> safe_chars_for_path
