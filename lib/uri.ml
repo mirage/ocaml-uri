@@ -16,8 +16,15 @@
  *
  *)
 
+open Astring
 open Sexplib.Std
 open Sexplib.Conv (* Workaround for bug in Sexplib when used without Core *)
+
+module Option = struct
+  let (>>=) o f = match o with
+    | None -> None
+    | Some v -> f v
+end
 
 type component = [
   | `Scheme
@@ -78,7 +85,7 @@ module Generic : Scheme = struct
   let sub_delims a =
     let subd = "!$&'()*+,;=" in
     for i = 0 to String.length subd - 1 do
-      let c = Char.code subd.[i] in
+      let c = Char.to_int subd.[i] in
       a.(c) <- true
     done;
     a
@@ -88,50 +95,50 @@ module Generic : Scheme = struct
     let always_safe =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-~" in
     for i = 0 to String.length always_safe - 1 do
-      let c = Char.code always_safe.[i] in
+      let c = Char.to_int always_safe.[i] in
       a.(c) <- true
     done;
     a
 
   let pchar : safe_chars =
     let a = sub_delims (Array.copy safe_chars) in
-    a.(Char.code ':') <- true;
-    a.(Char.code '@') <- true;
+    a.(Char.to_int ':') <- true;
+    a.(Char.to_int '@') <- true;
     a
 
   let safe_chars_for_scheme : safe_chars =
     let a = Array.copy safe_chars in
-    a.(Char.code '+') <- true;
+    a.(Char.to_int '+') <- true;
     a
 
   (** Safe characters for the path component of a URI *)
   let safe_chars_for_path : safe_chars =
     let a = sub_delims (Array.copy pchar) in
     (* delimiter: non-segment delimiting uses should be pct encoded *)
-    a.(Char.code '/') <- false;
+    a.(Char.to_int '/') <- false;
     a
 
   let safe_chars_for_query : safe_chars =
     (* TODO: What about {"!","$",","}? See <https://github.com/avsm/ocaml-uri/commit/1ef3f1dfb41bdb4f33f223ffe16e62a33975661a#diff-740f2de53c9eb36e9670ddfbdb9ba914R171> *)
     let a = Array.copy pchar in
-    a.(Char.code '/') <- true;
-    a.(Char.code '?') <- true;
+    a.(Char.to_int '/') <- true;
+    a.(Char.to_int '?') <- true;
     (* '&' is safe but we should encode literals to avoid ambiguity
        with the already parsed qs params *)
-    a.(Char.code '&') <- false;
+    a.(Char.to_int '&') <- false;
     (* ';' is safe but some systems treat it like '&'. *)
-    a.(Char.code ';') <- false;
-    a.(Char.code '+') <- false;
+    a.(Char.to_int ';') <- false;
+    a.(Char.to_int '+') <- false;
     a
 
   let safe_chars_for_query_key : safe_chars =
     let a = Array.copy safe_chars_for_query in
-    a.(Char.code '=') <- false;
+    a.(Char.to_int '=') <- false;
     a
 
   let safe_chars_for_query_value : safe_chars =
     let a = Array.copy safe_chars_for_query in
-    a.(Char.code ',') <- false;
+    a.(Char.to_int ',') <- false;
     a
 
   let safe_chars_for_fragment : safe_chars = safe_chars_for_query
@@ -141,7 +148,7 @@ module Generic : Scheme = struct
   let safe_chars_for_userinfo : safe_chars =
     let a = Array.copy safe_chars in
     (* delimiter: non-segment delimiting uses should be pct encoded *)
-    a.(Char.code ':') <- false;
+    a.(Char.to_int ':') <- false;
     a
 
   let safe_chars_for_component = function
@@ -164,7 +171,7 @@ module Http : Scheme = struct
   include Generic
 
   let normalize_host = function
-    | Some hs -> Some (String.lowercase hs)
+    | Some hs -> Some (String.Ascii.lowercase hs)
     | None -> None
 
   let canonicalize_port = function
@@ -191,7 +198,7 @@ module File : Scheme = struct
 
   let normalize_host = function
     | Some hs ->
-      let hs = String.lowercase hs in
+      let hs = String.Ascii.lowercase hs in
       if hs="localhost" then Some "" else Some hs
     | None -> None
 end
@@ -202,7 +209,7 @@ module Urn : Scheme = struct
 end
 
 let module_of_scheme = function
-  | Some s -> begin match String.lowercase s with
+  | Some s -> begin match String.Ascii.lowercase s with
       | "http" -> (module Http : Scheme)
       | "https"  -> (module Https : Scheme)
       | "file" -> (module File : Scheme)
@@ -267,7 +274,7 @@ end = struct
       if cur >= len then begin
         Buffer.add_substring buf b start (cur-start);
       end else begin
-        let c = Char.code b.[cur] in
+        let c = Char.to_int b.[cur] in
         if safe_chars.(c) then
           scan start (cur+1)
         else begin
@@ -281,14 +288,13 @@ end = struct
     Buffer.contents buf
 
   let int_of_hex_char c =
-    let c = int_of_char (Char.uppercase c) - 48 in
-    if c > 9
-    then if c > 16 && c < 23
-      then c - 7
-      else raise (Failure "int_of_hex_char")
-    else if c >= 0
-    then c
-    else raise (Failure "int_of_hex_char")
+    let c = int_of_char (Char.Ascii.uppercase c) - 48 in
+    if c > 9 then
+      if c > 16 && c < 23
+      then Some (c - 7)
+      else None
+    else if c >= 0 then Some c
+    else None
 
   (** Scan for percent-encoding and convert them into ASCII.
       @return a percent-decoded string *)
@@ -297,35 +303,40 @@ end = struct
     let len = String.length b in
     let buf = Buffer.create len in
     let rec scan start cur =
-      if cur >= len then Buffer.add_substring buf b start (cur-start)
+      if cur >= len then
+        Buffer.add_substring buf b start (cur-start)
       else if b.[cur] = '%' then begin
         Buffer.add_substring buf b start (cur-start);
         let cur = cur + 1 in
         if cur >= len then Buffer.add_char buf '%'
-        else match (try Some (int_of_hex_char b.[cur])
-                    with Failure "int_of_hex_char" ->
-                      Buffer.add_char buf '%';
-                      None) with
-        | None -> scan cur cur
-        | Some highbits -> begin
-          let cur = cur + 1 in
-          if cur >= len then begin
+        else match int_of_hex_char b.[cur] with
+          | None ->
             Buffer.add_char buf '%';
-            Buffer.add_char buf b.[cur-1]
-          end else begin
-            let start_at =
-              try
-                let lowbits = int_of_hex_char b.[cur] in
-                Buffer.add_char buf (Char.chr (highbits lsl 4 + lowbits));
-                cur+1
-              with Failure "int_of_hex_char" ->
+            scan cur cur
+          | Some highbits -> begin
+              let cur = cur + 1 in
+              if cur >= len then begin
                 Buffer.add_char buf '%';
-                Buffer.add_char buf b.[cur-1];
-                cur
-            in scan start_at start_at
-          end
-        end
-      end else scan start (cur+1)
+                Buffer.add_char buf b.[cur-1]
+              end else begin
+                let start_at =
+                  let open Option in
+                  match begin
+                    int_of_hex_char b.[cur] >>= fun lowbits ->
+                    Char.of_int (highbits lsl 4 + lowbits)
+                  end with
+                  | Some chr ->
+                    Buffer.add_char buf chr;
+                    cur+1
+                  | None ->
+                    Buffer.add_char buf '%';
+                    Buffer.add_char buf b.[cur-1];
+                    cur
+                in scan start_at start_at
+              end
+            end
+      end
+      else scan start (cur+1)
     in
     scan 0 0;
     Buffer.contents buf
@@ -381,7 +392,7 @@ module Path = struct
   let compare = compare_list String.compare
 
   (* Make a path token list from a percent-encoded string *)
-  let path_of_encoded ps =
+  let of_encoded ps =
     let tokl = Stringext.full_split ps ~on:'/' in
     List.map pct_decode tokl
 
@@ -400,7 +411,7 @@ module Path = struct
       | s::r -> loop 0 (s::outp) r
     in loop 0 [] revp
 
-  let encoded_of_path ?scheme p =
+  let to_encoded ?scheme p =
     let len = List.fold_left (fun c tok -> String.length tok + c) 0 p in
     let buf = Buffer.create len in
     iter_concat (fun buf -> function
@@ -416,9 +427,6 @@ module Path = struct
     | _, ("/"::rbpath | _::"/"::rbpath) -> List.rev_append ("/"::rbpath) relpath
     | _, _ -> relpath
 end
-
-let path_of_encoded = Path.path_of_encoded
-let encoded_of_path ?scheme = Path.encoded_of_path ?scheme
 
 (* Query string handling, to and from an assoc list of key/values *)
 module Query = struct
@@ -565,7 +573,7 @@ let normalize schem uri =
     | Some x -> Some (Pct.unlift_decoded f x)
     | None -> None
   in {uri with
-      scheme=dob String.lowercase uri.scheme;
+      scheme=dob String.Ascii.lowercase uri.scheme;
       host=cast_opt (Scheme.normalize_host (uncast_opt uri.host))
      }
 
@@ -584,7 +592,7 @@ let make ?scheme ?userinfo ?host ?port ?path ?query ?fragment () =
     | None -> None | Some u -> Some (userinfo_of_encoded u) in
   let path = match path with
     |None -> [] | Some p ->
-      let path = path_of_encoded p in
+      let path = Path.of_encoded p in
       match host, path with
       | None, _ | Some _, "/"::_ | Some _, [] -> path
       | Some _, _  -> "/"::path
@@ -637,7 +645,7 @@ let of_string s =
   in
   let path =
     match get_opt_encoded subs 5 with
-    | Some x -> Path.path_of_encoded (Pct.uncast_encoded x)
+    | Some x -> Path.of_encoded (Pct.uncast_encoded x)
     | None -> []
   in
   let query =
@@ -691,7 +699,7 @@ let to_string uri =
   (match uri.path with (* Handle relative paths correctly *)
   | [] -> ()
   | "/"::_ ->
-    Buffer.add_string buf (Pct.uncast_encoded (encoded_of_path ?scheme uri.path))
+    Buffer.add_string buf (Pct.uncast_encoded (Path.to_encoded ?scheme uri.path))
   | first_segment::_ ->
     (match uri.host with
      | Some _ -> Buffer.add_char buf '/'
@@ -704,7 +712,7 @@ let to_string uri =
          | None -> Buffer.add_string buf "./"
     );
     Buffer.add_string buf
-      (Pct.uncast_encoded (encoded_of_path ?scheme uri.path))
+      (Pct.uncast_encoded (Path.to_encoded ?scheme uri.path))
   );
   Query.(match uri.query with
     | Raw (None,_) | KV [] -> ()
@@ -780,12 +788,14 @@ let with_port uri port =
 
 (* Return the path component *)
 let path uri = Pct.uncast_encoded (match uri.scheme with
-  | None -> encoded_of_path uri.path
-  | Some s -> encoded_of_path ~scheme:(Pct.uncast_decoded s) uri.path)
+  | None -> Path.to_encoded uri.path
+  | Some s -> Path.to_encoded ~scheme:(Pct.uncast_decoded s) uri.path)
 let with_path uri path =
-  let path = path_of_encoded path in
+  let path = Path.of_encoded path in
   match host uri, path with
-  | None, _ | Some _, "/"::_ | Some _, [] -> { uri with path=path }
+  | None, _
+  | Some _, "/"::_
+  | Some _, [] -> { uri with path=path }
   | Some _, _  -> { uri with path="/"::path }
 
 let fragment uri = get_decoded_opt uri.fragment
@@ -804,7 +814,7 @@ let get_query_param' uri k = Query.(find (kv uri.query) k)
 let get_query_param uri k =
   match get_query_param' uri k with
   |None -> None
-  |Some v -> Some (String.concat "," v)
+  |Some v -> Some (String.concat ~sep:"," v)
 
 let with_query uri query = { uri with query=Query.KV query }
 let q_s q = List.map (fun (k,v) -> k,[v]) q
