@@ -622,6 +622,50 @@ let test_canonicalize =
     )
   ) canonical_map
 
+let aws_encode_val =
+  let safe_chars =
+    let a = Array.make 256 false in
+    let always_safe =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-~" in
+    for i = 0 to String.length always_safe - 1 do
+      let c = Char.code always_safe.[i] in
+      a.(c) <- true
+    done;
+    a
+  in
+  fun s ->
+    let len = (String.length s) in
+    let b = Buffer.create len in
+    for i = 0 to len - 1 do
+      let code = Char.code s.[i] in
+      if safe_chars.(code) then
+        Buffer.add_char b s.[i]
+      else
+        Buffer.add_string b (Printf.sprintf "%%%02X" code);
+    done;
+    Buffer.contents b
+
+let aws_encode kv =
+  let kvs = List.map (fun (x, y) -> x ^ "=" ^ aws_encode_val y) kv in
+  String.concat "&" kvs
+
+let test_aws_encode =
+  let f q =
+    let query = List.map (fun (k, v) -> (k, [v])) q in
+    let u = Uri.make ~encoding:"aws" ~query () in
+    Uri.path_and_query u
+  in
+  let test q =
+    let q' = "/?" ^ aws_encode q in
+    (q, q')
+  in
+  List.map (fun (in_, out) ->
+    out >:: (fun () -> assert_equal ~printer:(fun x -> x) out (f in_)))
+  [ test [ "q","*" ]
+  ; test [ "q","star wars"
+         ; "q.options", "{fields: ['title^5.0','description']}"]
+  ]
+
 (* Returns true if the result list contains successes only.
    Copied from oUnit source as it isnt exposed by the mli *)
 let rec was_successful =
@@ -654,6 +698,7 @@ let _ =
     @ test_sexping
     @ test_with_change
     @ test_canonicalize
+    @ test_aws_encode
   ) in
   let verbose = ref false in
   let set_verbose _ = verbose := true in
