@@ -871,7 +871,10 @@ let resolve schem base uri =
     | None, Some _ ->
       {uri with scheme=base.scheme; path=remove_dot_segments uri.path}
     | None, None ->
-      let uri = {uri with scheme=base.scheme; host=base.host; port=base.port} in
+      let userinfo = match uri.userinfo with
+            None -> base.userinfo
+          | Some _ -> uri.userinfo in
+      let uri = {uri with scheme=base.scheme; host=base.host; port=base.port; userinfo} in
       let path_str = path uri in
       if path_str=""
       then { uri with
