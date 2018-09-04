@@ -4,7 +4,7 @@
   (wrapped false)
   (modules (uri uri_re))
   (preprocess (pps (ppx_sexp_conv)))
-  (libraries (sexplib re.posix stringext))))
+  (libraries (re.posix sexplib0 stringext))))
 
 (library
  ((name        uri_top)

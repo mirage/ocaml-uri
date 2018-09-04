@@ -18,8 +18,7 @@
 
 [@@@ocaml.warning "-32"]
 
-open Sexplib.Std
-open Sexplib.Conv (* Workaround for bug in Sexplib when used without Core *)
+open Sexplib0.Sexp_conv
 
 type component = [
   | `Scheme
