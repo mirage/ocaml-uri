@@ -1,5 +1,14 @@
-dev
----
+v2.1.0 2019-01-31
+-----------------
+
+* Add `Uri.pp` as an alias to `Uri.pp_hum`, as the `pp` form
+  is more commonly used. (@avsm)
+* Add an `[@@ocaml.toplevel_printer]` attribute to Uri.pp
+  so that it will be automatically loaded on modern Utop versions. (@avsm)
+* Upgrade last remaining `jbuild` file to `dune` (@avsm)
+
+v2.0.0 2018-10-15
+-----------------
 
 * Expose a `compare` function in `Uri_sexp` so that it will work
   with `deriving compare,sexp`.
@@ -20,6 +29,7 @@ v2.0.0 2018-10-15
 * Switch to using sexplib0 instead of sexplib for easier dependencies
   (based on #123 by @mseri)
 * Port build to Dune from jbuilder.
+* Add benchmarks using `core_bench` (#125 via @drup)
 
 v1.9.7 2018-07-01
 -----------------
