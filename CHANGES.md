@@ -1,4 +1,4 @@
-v2.0.0 2018-10-15
+v2.1.0 2019-12-12
 -----------------
 
 * Expose a `compare` function in `Uri_sexp` so that it will work
