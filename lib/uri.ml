@@ -28,6 +28,7 @@ type component = [
   | `Query_key
   | `Query_value
   | `Fragment
+  | `Generic
   | `Custom of (component * string * string) (* (component * safe chars * unsafe chars) *)
 ]
 
@@ -173,6 +174,7 @@ module Generic : Scheme = struct
          safe_chars.(c) <- false
        done;
        safe_chars
+    | `Generic
     | _ -> safe_chars
 
   let normalize_host hso = hso
