@@ -422,6 +422,9 @@ let test_with_change = [
     let urn = Uri.of_string "urn:uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6" in
     let urn2= Uri.with_scheme urn (Some "urn") in
     assert_equal ~printer urn urn2;
+    let git = Uri.of_string "git@github.com:owner/repo" in
+    let pp_option pp ppf = function Some x -> Format.fprintf ppf "%a" pp x | None -> () in
+    assert_equal ~printer:(Format.asprintf "%a" (pp_option Format.pp_print_string)) (Uri.scheme git) None ;
 
     let urn_path =
       Uri.with_path Uri.empty "uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
