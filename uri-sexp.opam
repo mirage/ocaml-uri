@@ -16,7 +16,7 @@ depends: [
   "dune" {>= "1.2.0"}
   "ppx_sexp_conv" {>= "v0.13.0"}
   "sexplib0"
-  "ounit" {with-test}
+  "ounit2" {with-test}
 ]
 build: [
   ["dune" "subst"] {pinned}
