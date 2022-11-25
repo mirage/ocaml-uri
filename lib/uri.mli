@@ -283,3 +283,22 @@ module Parser : sig
   val ipv6 : string Angstrom.t
   val uri_reference : t Angstrom.t
 end
+
+(** Specializations for HTTP and HTTPS schemes as per RFC9110 *)
+module Absolute_http : sig
+  type uri := t
+  type t
+
+  val of_uri : uri -> (t, [ `Msg of string ]) result
+  val to_uri : t -> uri
+
+  val of_string : string -> t
+  val to_string : ?pct_encoder:pct_encoder -> t -> string
+
+  val make : scheme:[ `Http | `Https ]-> host:string ->
+    ?userinfo:string -> ?port:int -> ?path:string ->
+    ?query:(string * string list) list -> ?fragment:string -> unit -> t
+
+  val host : t -> string
+  val scheme : t -> [`Http | `Https]
+end

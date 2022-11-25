@@ -689,6 +689,49 @@ let compat_uris =
   ; "http://user:password@\nhost/path"
   ]
 
+let http_uris =
+  [ "http://foo.bar/a/b/c"
+  ; "http://foo.bar:443/a/b/c"
+  ; "https://foo.bar/a/b/c"
+  ; "https://foo.bar:80/a/b/c"
+  ; "http://example.org/path?query=foo"
+  ]
+
+let non_http_uris =
+  [ "//example.net:80/a"
+  ; "ftp://example.org"
+  ; "ssh://example.org"
+  ; "git://example.org"
+  ; ""
+  ; ".."
+  ; "/.."
+  ; "/foo/./bar"
+  ; "/foo/../../"
+  ]
+
+let eval_rfc9110_uris tests ~f =
+  List.map (fun input ->
+    let name = sprintf "http_uri:%s" input in
+    let test () =
+      Uri.of_string input |> Uri.Absolute_http.of_uri |> f ~input in
+    name >:: test
+  ) tests
+
+let test_parseable_rfc9110_uris =
+  let eval ~input = function
+    | Ok http_uri ->
+      assert_equal (Uri.Absolute_http.to_string http_uri) input
+    | Error (`Msg msg) -> assert_failure msg
+  in
+  eval_rfc9110_uris http_uris ~f:eval
+
+let test_unparseable_rfc9110_uris =
+  let eval ~input = function
+    | Ok _ -> assert_failure (sprintf "unexpected conversion of non-rfc9110 uri: %s" input)
+    | Error _ -> ()
+  in
+  eval_rfc9110_uris non_http_uris ~f:eval
+
 (* Returns true if the result list contains successes only.
    Copied from oUnit source as it isnt exposed by the mli *)
 let rec was_successful =
@@ -723,6 +766,8 @@ let _ =
     @ test_canonicalize
     @ test_with_uri
     @ test_ipv6_parsing
+    @ test_parseable_rfc9110_uris
+    @ test_unparseable_rfc9110_uris
   ) in
   let verbose = ref false in
   let set_verbose _ = verbose := true in

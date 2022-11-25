@@ -1110,3 +1110,87 @@ let of_string s =
   | Error _ ->
     (* Shouldn't really happen if the parser is forgiving. *)
     empty
+
+module Absolute_http = struct
+  type uri = t
+  type t =
+    { scheme : [ `Http | `Https ];
+      userinfo: Userinfo.t option;
+      host : Pct.decoded;
+      port : int option;
+      path : Path.t;
+      query : Query.t;
+      fragment : Pct.decoded option
+    }
+
+  let ( let* ) = Result.bind
+
+  let to_uri { scheme; userinfo; host; port; path; query; fragment } =
+    let scheme =
+      match scheme with
+      | `Http -> Pct.cast_decoded "http"
+      | `Https -> Pct.cast_decoded "https"
+    in
+    ({ scheme = Some scheme;
+       userinfo;
+       host = Some host;
+       port;
+       path;
+       query;
+       fragment } : uri)
+  ;;
+
+  let of_uri ({ scheme; userinfo; host; port; path; query; fragment }: uri) =
+    let* scheme =
+      match scheme with
+      | None -> Error (`Msg "No scheme present in URI")
+      | Some scheme ->
+        (match Pct.uncast_decoded scheme with
+         | "http" -> Ok `Http
+         | "https" -> Ok `Https
+         | unsupported_scheme ->
+           Error
+             (`Msg
+                (Printf.sprintf
+                   "Only http and https URIs are supported. %s is invalid."
+                   unsupported_scheme)))
+    in
+    let* host = Option.to_result ~none:(`Msg "host is required for HTTP(S) uris") host in
+    Ok { scheme; userinfo; host; port; path; query; fragment }
+  ;;
+
+  let of_string s = match of_string s |> of_uri with
+    | Ok t -> t
+    | Error (`Msg error) -> failwith error
+
+  let to_string ?pct_encoder t = to_uri t |> to_string ?pct_encoder
+
+  let normalize t =
+    {t with
+        host=Pct.cast_decoded (String.lowercase_ascii (Pct.uncast_decoded t.host))
+       }
+
+  let make ~scheme ~host ?userinfo ?port ?path ?query ?fragment () =
+    let decode = function
+      |Some x -> Some (Pct.cast_decoded x) |None -> None in
+    let userinfo = match userinfo with
+      | None -> None | Some u -> Some (userinfo_of_encoded u) in
+    let path = match path with
+      |None -> [] | Some p ->
+        let path = path_of_encoded p in
+        match path with
+        |  "/"::_ |  [] -> path
+        | _  -> "/"::path
+    in
+    let query = match query with
+      | None -> Query.KV []
+      | Some p -> Query.KV p
+    in
+    normalize
+      { scheme;
+        userinfo;
+        host=Pct.cast_decoded host; port; path; query; fragment=decode fragment }
+
+  let host t = Pct.uncast_decoded t.host
+  let scheme t = t.scheme
+end
