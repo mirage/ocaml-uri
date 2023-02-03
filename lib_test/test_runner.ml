@@ -59,9 +59,9 @@ let uri_encodes = [
   "/wh/at/ev/er", (Uri.make ~path:"/wh/at/ev/er" ());
   "/wh/at!/ev%20/er", (Uri.make ~path:"/wh/at!/ev /er" ());
   (* IPv6 literal *)
-  "http://%5Bdead%3Abeef%3A%3Adead%3A0%3Abeaf%5D",
+  "http://[dead:beef::dead:0:beaf]",
     (Uri.make ~scheme:"http" ~host:"[dead:beef::dead:0:beaf]" ());
-  "http://user:pass@%5B2001%3A41d1%3Afe67%3A500%3A227%3Ac6ff%3Afe5a%3Aefa0%5D:6789/wh/at/ever?foo=1&bar=5#5",
+  "http://user:pass@[2001:41d1:fe67:500:227:c6ff:fe5a:efa0]:6789/wh/at/ever?foo=1&bar=5#5",
   (Uri.make ~scheme:"http" ~userinfo:"user:pass" ~host:"[2001:41d1:fe67:500:227:c6ff:fe5a:efa0]"
      ~port:6789 ~path:"/wh/at/ever" ~query:["foo",["1"];"bar",["5"]] ~fragment:"5" ());
   (* IPv6 literal with zone id *)
@@ -338,6 +338,7 @@ let generic_uri_norm = [
   "//colon%3Auser@example.net/",
   "//colon%3Auser@example.net/";
   "foo+bar%3a", "./foo+bar:";
+  "http://[2001:DB8:1234:5678:90ab:cdef::0123]/%68%65%6c%6c%6f", "http://[2001:db8:1234:5678:90ab:cdef::0123]/hello";
   (let p_q = "/foo%20bar/" in
    p_q, Uri.(path_and_query (of_string p_q)));
 ]
@@ -646,7 +647,10 @@ let with_uri =
    Uri.with_uri ~query:None base,                  "scheme://user:pass@host:0/path#fragment";
    Uri.with_uri ~query:(Some ["new", ["a"]]) base, "scheme://user:pass@host:0/path?new=a#fragment";
    Uri.with_uri ~fragment:None base,               "scheme://user:pass@host:0/path?query=arg";
-   Uri.with_uri ~fragment:(Some "new") base,       "scheme://user:pass@host:0/path?query=arg#new"]
+   Uri.with_uri ~fragment:(Some "new") base,       "scheme://user:pass@host:0/path?query=arg#new";
+   Uri.with_uri ~host:(Some "2001:DB8:1234:5678:90ab:cdef::0123") base,
+     "scheme://user:pass@[2001:DB8:1234:5678:90ab:cdef::0123]:0/path?query=arg#fragment"
+   ]
 
 let test_with_uri =
   List.map (fun (input, output) ->
