@@ -1,11 +1,17 @@
-(executable
- (name fuzz)
- (libraries uri uri-re uri-sexp crowbar fmt))
+; (executable
+;  (name fuzz)
+;  (libraries uri uri-re uri-sexp crowbar))
 
-(alias
- (name fuzz)
- (deps fuzz.exe (source_tree input))
- (action (run
-    timeout --preserve-status 50m
-    bun -v --input=input --output=output -s
-    -- ./fuzz.exe)))
+; (alias
+;  (name fuzz)
+;  (deps fuzz.exe (source_tree input))
+;  (action (run
+;     timeout --preserve-status 50m
+;     bun -v --input=input --output=output -s
+;     -- ./fuzz.exe)))
+
+(tests
+ (names fuzz)
+ (package uri)
+ (libraries uri uri-re crowbar)
+ (deps (source_tree input)))
