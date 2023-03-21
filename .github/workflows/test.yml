@@ -11,24 +11,33 @@ jobs:
       matrix:
         os:
           - macos-latest
-        ocaml-version:
-          - 4.12.0
-          - 4.11.1
-          - 4.10.0
-          - 4.09.1
-          - 4.08.2
+        ocaml-compiler:
+          - 5.0
+          - 4.14.1
+          - 4.13.1
+          - 4.08.1
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Use OCaml ${{ matrix.ocaml-version }}
-        uses: avsm/setup-ocaml@v1
+        uses: actions/checkout@v3
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v2
         with:
-          ocaml-version: ${{ matrix.ocaml-version }}
-      - run: opam pin add . --no-action
-      - run: opam depext uri uri-sexp uri-re --yes --with-doc --with-test
-      - run: opam install . --deps-only --with-doc --with-test
-      - run: opam exec -- dune build
-      - run: opam exec -- dune runtest
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+      - name: Install dependencies
+        run: |
+          opam install . --deps-only --with-test
+
+      - name: Build
+        run: |
+          opam exec -- dune build
+
+      - name: Tests
+        run: |
+          opam exec -- dune build @runtest
+
+      - name: Opam Lint
+        run: |
+          opam lint uri.opam uri-re.opam uri-sexp.opam uri-bench.opam

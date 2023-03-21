@@ -1,5 +1,5 @@
 open Core
-open Core_bench.Std
+open Core_bench
 
 let make_bench_parsing (name, str) =
   Bench.Test.create ~name
@@ -30,4 +30,6 @@ let benchmarks = [
     (List.map ~f:make_bench_parsing parsing_benchs);
 ]
 
-let () = Command.run (Bench.make_command benchmarks)
+let () = 
+  Bench.make_command benchmarks
+  |> Command_unix.run
