@@ -1,3 +1,11 @@
+v4.3.0 2023-04-19
+-----------------
+
+* Add `Uri.Absolute_http`, an RFC9110-compliance specialization of a
+  `Uri.t`. (#164 #162 @torinnd).
+* Add a `uri-bench` package for the benchmarking dependencies in this
+  repository (#166 @tmcgilchrist).
+
 v4.2.0 2021-04-26
 -----------------
 
