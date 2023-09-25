@@ -1,3 +1,16 @@
+v4.4.0 2023-09-25
+-----------------
+
+* **breaking change** Fix parsing & printing of IPv6 addresses in the host part of an uri
+
+  If we follow the RFC3986 correctly, IPv6 must be surrounded by '[' and ']'. Old versions
+  of `ocaml-uri` escaped these characters. The new version interprets these characters to
+  recognize an IPv6 address.
+
+  Users should take note of this change in behaviour, which fixes a number of bugs in HTTP
+  requests. (@anmonteiro, review by several maintainers, #169)
+* Upgrade tests to `ounit2` (@Alessandro-Barbieri, #161)
+
 v4.3.0 2023-04-19
 -----------------
 
