@@ -985,7 +985,16 @@ module Parser = struct
       [ ipv4_address >>| (fun h -> `Ipv4_literal h)
       ; ipv6_address >>| (fun h -> `Ipv6_literal h)
       ; reg_name >>| (fun s -> `Host (Pct.decode (Pct.cast_encoded s)))
-      (* ipv4_literal TODO *)
+      (* TODO(dinosaure): According to RFC3986:
+
+         host        = IP-literal / IPv4address / reg-name
+         IP-literal  = "[" ( IPv6address / IPvFuture  ) "]"
+         IPvFuture   = "v" 1*HEXDIG "." 1*( unreserved / sub-delims / ":" )
+
+         IPvFuture is not implemented. We should handle it:
+
+         IPvFuture   = "v" 1*HEXDIG "." 1*( unreserved / sub-delims / ":" )
+       *)
       ]
 
   let userinfo =
