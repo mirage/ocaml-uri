@@ -43,6 +43,6 @@ Once installed, there are three ocamlfind packages available for your use:
 
 - Issues: <https://github.com/mirage/ocaml-uri/issues>
 - E-mail: <mirageos-devel@lists.xenproject.org>
-- API Documentation: <http://docs.mirage.io/uri/>
+- API Documentation: <https://ocaml.org/p/uri/latest/doc/index.html>
 
 [![Build Status](https://travis-ci.org/mirage/ocaml-uri.png)](https://travis-ci.org/mirage/ocaml-uri)
