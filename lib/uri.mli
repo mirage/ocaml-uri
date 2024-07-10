@@ -211,6 +211,9 @@ val path : ?pct_encoder:pct_encoder -> t -> string
 (** Get the encoded path and query components of a URI *)
 val path_and_query : t -> string
 
+(** Get the unencoded path component of a URI *)
+val path_unencoded : t -> string
+
 (** Replace the path URI with the supplied encoded path.
     If a host is present in the supplied URI, the path is made absolute but not
     resolved. If the path is empty, the path component is removed.
