@@ -1,8 +1,10 @@
-name: Main workflow
+name: Builds, tests & co
 
 on:
-  - pull_request
   - push
+  - pull_request
+
+permissions: read-all
 
 jobs:
   build:
@@ -11,33 +13,33 @@ jobs:
       matrix:
         os:
           - macos-latest
+          - ubuntu-latest
+          # - windows-latest
         ocaml-compiler:
-          - 5.0
-          - 4.14.1
-          - 4.13.1
-          - 4.08.1
-
+          - 5
+          - 4
+        include:
+          - os: ubuntu-latest
+            ocaml-compiler: "4.08"
     runs-on: ${{ matrix.os }}
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Use OCaml ${{ matrix.ocaml-compiler }}
-        uses: ocaml/setup-ocaml@v2
+      - name: Checkout tree
+        uses: actions/checkout@v4
+      - name: Set-up OCaml
+        uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
-      - name: Install dependencies
-        run: |
-          opam install . --deps-only --with-test
+      - run: opam install . --deps-only --with-test
+      - run: opam exec -- dune build
+      - run: opam exec -- dune runtest
 
-      - name: Build
-        run: |
-          opam exec -- dune build
-
-      - name: Tests
-        run: |
-          opam exec -- dune build @runtest
-
-      - name: Opam Lint
-        run: |
-          opam lint uri.opam uri-re.opam uri-sexp.opam uri-bench.opam
+  lint-opam:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tree
+        uses: actions/checkout@v4
+      - name: Set-up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5
+      - uses: ocaml/setup-ocaml/lint-opam@v3
