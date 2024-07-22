@@ -438,6 +438,12 @@ module Path = struct
     ) "" buf p;
     Pct.cast_encoded (Buffer.contents buf)
 
+  let decoded_of_path p =
+    let len = List.fold_left (fun c tok -> String.length tok + c) 0 p in
+    let buf = Buffer.create len in
+    iter_concat (fun buf s -> Buffer.add_string buf s) "" buf p;
+    Pct.cast_decoded (Buffer.contents buf)
+
   (* Subroutine for resolve <http://tools.ietf.org/html/rfc3986#section-5.2.3> *)
   let merge bhost bpath relpath =
     match bhost, List.rev bpath with
@@ -448,6 +454,7 @@ end
 
 let path_of_encoded = Path.path_of_encoded
 let encoded_of_path ?scheme ~component = Path.encoded_of_path ?scheme ~component
+let decoded_of_path = Path.decoded_of_path
 
 (* Query string handling, to and from an assoc list of key/values *)
 module Query = struct
@@ -753,6 +760,8 @@ let with_path uri path =
   match host uri, path with
   | None, _ | Some _, "/"::_ | Some _, [] -> { uri with path=path }
   | Some _, _  -> { uri with path="/"::path }
+
+let path_unencoded uri = Pct.uncast_decoded (decoded_of_path uri.path)
 
 let fragment uri = get_decoded_opt uri.fragment
 let with_fragment uri =
