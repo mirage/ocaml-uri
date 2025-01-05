@@ -26,3 +26,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test & os != "macos"}
 ]
+x-maintenance-intent: [ "(latest)" ]
