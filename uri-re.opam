@@ -28,3 +28,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test & os != "macos"}
 ]
 messages: [ "Deprecated. This package is outdated, you should consider using uri instead" ]
+x-maintenance-intent: [ "(latest)" ]
