@@ -862,7 +862,7 @@ module Parser = struct
   let scheme =
     lift
       (fun s -> Some (Pct.decode (Pct.cast_encoded s)))
-      (take_while (fun c -> c <> ':' && c <> '/' && c <> '?' && c <> '#')
+      (take_while (fun c -> c <> '@' && c <> ':' && c <> '/' && c <> '?' && c <> '#')
       <* char ':')
     <|> return None
 
