@@ -151,7 +151,8 @@ let test_query_decode =
 let test_query_decode_copy =
   List.map (fun query ->
     let test () =
-      let s = Bytes.to_string (Bytes.of_string query) in
+      (* We need a copy of the original *)
+      let s = String.map Fun.id query in
       ignore (Uri.query_of_encoded s);
       assert_equal ~printer:(fun s -> s) query s in
     ("query_of_encoded " ^ query) >:: test
