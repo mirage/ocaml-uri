@@ -480,6 +480,7 @@ module Query = struct
 
   let split_query qs =
     let els = Stringext.split ~on:'&' qs in
+    (* Replace a + in a query string with a space. *)
     let plus_to_space = String.map (function '+' -> ' ' | c -> c) in
     let rec loop acc = function
       | (k::v::_)::tl ->
