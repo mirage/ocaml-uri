@@ -1,3 +1,9 @@
+unreleased
+----------
+
+* Do not modify the argument of `Uri.query_of_encoded` with OCaml >= 5.5,
+  where `String.sub` can return its argument (#185)
+
 v4.4.0 2023-09-25
 -----------------
 
