@@ -146,6 +146,17 @@ let test_query_decode =
     uri_str >:: test
   ) uri_query
 
+(* Decoding must not modify its argument, even when the whole query is a
+   single key. *)
+let test_query_decode_copy =
+  List.map (fun query ->
+    let test () =
+      let s = Bytes.to_string (Bytes.of_string query) in
+      ignore (Uri.query_of_encoded s);
+      assert_equal ~printer:(fun s -> s) query s in
+    ("query_of_encoded " ^ query) >:: test
+  ) ["a+b"; "+"; "a+b=c+d"; "a+b&c"]
+
 (* Test URI query encoding. No pct encoding as that is done later by Uri.to_string *)
 let uri_query_make = [
   [], "";
@@ -756,6 +767,7 @@ let _ =
     @ test_uri_encode
     @ test_uri_decode
     @ test_query_decode
+    @ test_query_decode_copy
     @ test_query_encode
     @ test_rel_res
     @ test_file_rel_res
